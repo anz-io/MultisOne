@@ -5,7 +5,8 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 
-abstract contract MultiOnesAccessConstants {
+abstract contract MultiOnesConstants {
+    bytes32 public constant DEFAULT_ADMIN_ROLE_OVERRIDE = 0x00;
     bytes32 public constant KYC_OPERATOR_ROLE = keccak256("KYC_OPERATOR_ROLE");
     bytes32 public constant PRICE_UPDATER_ROLE = keccak256("PRICE_UPDATER_ROLE");
     bytes32 public constant KYC_VERIFIED_USER_ROLE = keccak256("KYC_VERIFIED_USER_ROLE");
@@ -13,7 +14,7 @@ abstract contract MultiOnesAccessConstants {
 }
 
 
-contract MultiOnesAccess is AccessControlUpgradeable, UUPSUpgradeable, MultiOnesAccessConstants {
+contract MultiOnesAccess is MultiOnesConstants, UUPSUpgradeable, AccessControlUpgradeable {
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -30,6 +31,13 @@ contract MultiOnesAccess is AccessControlUpgradeable, UUPSUpgradeable, MultiOnes
         _setRoleAdmin(WHITELIST_TRANSFER_ROLE, DEFAULT_ADMIN_ROLE);
 
         _setRoleAdmin(KYC_VERIFIED_USER_ROLE, KYC_OPERATOR_ROLE);
+    }
+
+    function _authorizeUpgrade(address) internal view override {
+        require(
+            hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
+            "MultiOnesAccess: not owner"
+        );
     }
 
     // Same as calling `grantRole(KYC_VERIFIED_USER_ROLE, account)` by `KYC_OPERATOR_ROLE`
@@ -57,7 +65,5 @@ contract MultiOnesAccess is AccessControlUpgradeable, UUPSUpgradeable, MultiOnes
             _revokeRole(KYC_VERIFIED_USER_ROLE, accounts[i]);
         }
     }
-
-    function _authorizeUpgrade(address newImplementation) 
-        internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+    
 }
