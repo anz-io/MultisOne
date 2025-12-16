@@ -12,6 +12,7 @@ abstract contract MultiOnesConstants {
     bytes32 public constant PRICE_UPDATER_ROLE = keccak256("PRICE_UPDATER_ROLE");
     bytes32 public constant KYC_VERIFIED_USER_ROLE = keccak256("KYC_VERIFIED_USER_ROLE");
     bytes32 public constant WHITELIST_TRANSFER_ROLE = keccak256("WHITELIST_TRANSFER_ROLE");
+    bytes32 public constant TELLER_OPERATOR_ROLE = keccak256("TELLER_OPERATOR_ROLE");
     uint256 public constant MAX_BATCH_SIZE_LIMIT = 100;
 }
 
@@ -36,6 +37,7 @@ contract MultiOnesAccess is MultiOnesConstants, UUPSUpgradeable, AccessControlUp
         _setRoleAdmin(KYC_OPERATOR_ROLE, DEFAULT_ADMIN_ROLE);
         _setRoleAdmin(PRICE_UPDATER_ROLE, DEFAULT_ADMIN_ROLE);
         _setRoleAdmin(WHITELIST_TRANSFER_ROLE, DEFAULT_ADMIN_ROLE);
+        _setRoleAdmin(TELLER_OPERATOR_ROLE, DEFAULT_ADMIN_ROLE);
 
         _setRoleAdmin(KYC_VERIFIED_USER_ROLE, KYC_OPERATOR_ROLE);
     }
@@ -67,7 +69,7 @@ contract MultiOnesAccess is MultiOnesConstants, UUPSUpgradeable, AccessControlUp
 
     function kycPassBatch(address[] calldata accounts) public onlyRole(KYC_OPERATOR_ROLE) {
         require(accounts.length > 0, "MultiOnesAccess: accounts is empty");
-        require(accounts.length < MAX_BATCH_SIZE_LIMIT, "MultiOnesAccess: too many accounts");
+        require(accounts.length <= MAX_BATCH_SIZE_LIMIT, "MultiOnesAccess: too many accounts");
         for (uint256 i = 0; i < accounts.length; i++) {
             if (!hasRole(KYC_VERIFIED_USER_ROLE, accounts[i])) {
                 _grantRole(KYC_VERIFIED_USER_ROLE, accounts[i]);
@@ -95,4 +97,6 @@ contract MultiOnesAccess is MultiOnesConstants, UUPSUpgradeable, AccessControlUp
         }
     }
     
+    // =========================== Storage Gap =============================
+    uint256[50] private __gap;
 }

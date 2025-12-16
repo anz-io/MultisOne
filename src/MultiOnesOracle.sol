@@ -1,23 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
 import {MultiOnesConstants} from "./MultiOnesAccess.sol";
+
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
-
-contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
-
+contract MultiOnesOracle is 
+    MultiOnesConstants, 
+    IMultiOnesOracle, 
+    Initializable, 
+    UUPSUpgradeable 
+{
 
     // ============================== Storage ==============================
-
     struct PriceData {
         bool isActive;
         uint48 lastUpdate;
         uint256 price;
     }
+
 
     // ============================= Parameters ============================
     struct RoundData {
@@ -42,12 +47,18 @@ contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
 
     // ======================= Modifier & Constructor ======================
     modifier onlyOwner() {
-        _checkOwner();
+        require(
+            multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
+            "MultiOnesAccess: not owner"
+        );
         _;
     }
 
     modifier onlyPriceUpdater() {
-        _checkPriceUpdater();
+        require(
+            multionesAccess.hasRole(PRICE_UPDATER_ROLE, msg.sender), 
+            "MultiOnesAccess: not price updater"
+        );
         _;
     }
 
@@ -61,22 +72,9 @@ contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
         multionesAccess = IAccessControl(_multionesAccess);
     }
 
+
     // ========================= Internal functions ========================
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    function _checkOwner() internal view {
-        require(
-            multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
-            "MultiOnesAccess: not owner"
-        );
-    }
-
-    function _checkPriceUpdater() internal view {
-        require(
-            multionesAccess.hasRole(PRICE_UPDATER_ROLE, msg.sender), 
-            "MultiOnesAccess: not price updater"
-        );
-    }
 
     function _updatePriceInternal(address token, uint256 price) internal {
         require(priceData[token].isActive, "MultiOnesOracle: asset is not active");
@@ -100,9 +98,7 @@ contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
     }
 
 
-
     // =========================== View functions ==========================
-
     function isAssetActive(address token) external view returns (bool) {
         return priceData[token].isActive;
     }
@@ -132,7 +128,6 @@ contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
         address token, 
         uint80 roundId
     ) external view returns (uint80, uint256, uint256) {
-        require(priceData[token].isActive, "MultiOnesOracle: asset not supported");
         RoundData memory data = historicalPrices[token][roundId];
         require(data.updatedAt > 0, "MultiOnesOracle: no data for round");
         return (data.roundId, data.price, data.updatedAt);
@@ -142,7 +137,6 @@ contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
         address token, 
         uint256 timestamp
     ) external view returns (uint80, uint256, uint256) {
-        require(priceData[token].isActive, "MultiOnesOracle: asset not supported");
         uint80 currentRoundId = latestRoundId[token];
         require(currentRoundId > 0, "MultiOnesOracle: no history");
         
@@ -183,6 +177,7 @@ contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
         revert("MultiOnesOracle: timestamp not found");
     }
 
+
     // ====================== Write functions - admin ======================
     function setAssetStatus(address token, bool isActive) public onlyPriceUpdater {
         priceData[token].isActive = isActive;
@@ -204,4 +199,6 @@ contract MultiOnesOracle is MultiOnesConstants, Initializable, UUPSUpgradeable {
         }
     }
 
+    // =========================== Storage Gap =============================
+    uint256[50] private __gap;
 }
