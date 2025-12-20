@@ -17,7 +17,11 @@ abstract contract MultiOnesConstants {
 }
 
 
-contract MultiOnesAccess is MultiOnesConstants, UUPSUpgradeable, AccessControlUpgradeable {
+contract MultiOnesAccess is 
+    AccessControlUpgradeable, 
+    UUPSUpgradeable, 
+    MultiOnesConstants 
+{
 
     // ============================= Parameters ============================
     uint256 public totalKycPassedAddresses;
@@ -98,5 +102,5 @@ contract MultiOnesAccess is MultiOnesConstants, UUPSUpgradeable, AccessControlUp
     }
     
     // =========================== Storage Gap =============================
-    uint256[50] private __gap;
+    uint256[50] private _gap;
 }

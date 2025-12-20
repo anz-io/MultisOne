@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
-import {MultiOnesConstants} from "./MultiOnesAccess.sol";
-
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
+import {MultiOnesConstants} from "./MultiOnesAccess.sol";
+
 
 contract MultiOnesOracle is 
-    MultiOnesConstants, 
+    UUPSUpgradeable,
+    Initializable,
     IMultiOnesOracle, 
-    Initializable, 
-    UUPSUpgradeable 
+    MultiOnesConstants 
 {
 
     // ============================== Storage ==============================
@@ -110,7 +110,10 @@ contract MultiOnesOracle is
     ) external view returns (uint256, uint256) {
         PriceData memory data = priceData[token];
         require(data.isActive, "MultiOnesOracle: asset not supported");
-        require(block.timestamp - data.lastUpdate <= maxTimeDelay, "MultiOnesOracle: price stale");
+        require(
+            block.timestamp - data.lastUpdate <= maxTimeDelay, 
+            "MultiOnesOracle: price stale"
+        );
         return (data.price, block.timestamp - data.lastUpdate);
     }
 
@@ -200,5 +203,5 @@ contract MultiOnesOracle is
     }
 
     // =========================== Storage Gap =============================
-    uint256[50] private __gap;
+    uint256[50] private _gap;
 }
