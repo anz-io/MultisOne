@@ -15,7 +15,6 @@ contract MultiOnesOracle is
     IMultiOnesOracle, 
     MultiOnesConstants 
 {
-
     // ============================== Storage ==============================
     struct PriceData {
         bool isActive;

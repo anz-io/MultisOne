@@ -22,11 +22,10 @@ contract RWAToken is
     using SafeERC20 for IERC20;
 
     // ============================== Storage ==============================
+    bool public idoMode;
     IMultiOnesOracle public multionesOracle;
     IAccessControl public multionesAccess;
     uint256 public constant ORACLE_TIMEOUT = 24 hours;
-
-    bool public idoMode;
 
 
     // =============================== Events ==============================
@@ -57,18 +56,18 @@ contract RWAToken is
 
     function initialize(
         address _asset, // Underlying asset (USDC)
-        address _oracle,
+        address _multionesOracle,
         address _multionesAccess,
         string memory _name,
         string memory _symbol
     ) public initializer {
         require(_multionesAccess != address(0), "RWAToken: access zero address");
-        require(_oracle != address(0), "RWAToken: oracle zero address");
+        require(_multionesOracle != address(0), "RWAToken: oracle zero address");
 
         __ERC20_init(_name, _symbol);
         __ERC4626_init(IERC20(_asset));
 
-        multionesOracle = IMultiOnesOracle(_oracle);
+        multionesOracle = IMultiOnesOracle(_multionesOracle);
         multionesAccess = IAccessControl(_multionesAccess);
 
         idoMode = true;
@@ -123,10 +122,7 @@ contract RWAToken is
     }
 
 
-    // =========================== View functions ==========================
-
-
-    // =========================== Teller Functions ========================
+    // ====================== Admin & Teller Functions =====================
     function setIdoMode(bool status) public onlyOwner {
         idoMode = status;
         emit IdoModeSet(status);

@@ -18,10 +18,12 @@ contract RWATokenFactory is
     // ============================== Storage ==============================
     UpgradeableBeacon public beacon;
     IAccessControl public multionesAccess;
+    address public underlyingAsset;
+    address public multionesOracle;
 
     // Track all deployed RWA Tokens
-    mapping(address => bool) public isRWAToken;
-    address[] public allRWATokens;
+    mapping(address => bool) public isRwaToken;
+    address[] public allRwaTokens;
 
 
     // =============================== Events ==============================
@@ -48,8 +50,17 @@ contract RWATokenFactory is
         _disableInitializers();
     }
 
-    function initialize(address _multionesAccess) public initializer {
-        require(_multionesAccess != address(0), "Factory: zero address");
+    function initialize(
+        address _underlyingAsset,
+        address _multionesOracle,
+        address _multionesAccess
+    ) public initializer {
+        require(_underlyingAsset != address(0), "Factory: zero asset");
+        require(_multionesOracle != address(0), "Factory: zero oracle");
+        require(_multionesAccess != address(0), "Factory: zero access");
+        
+        underlyingAsset = _underlyingAsset;
+        multionesOracle = _multionesOracle;
         multionesAccess = IAccessControl(_multionesAccess);
 
         address rwaImplementation = address(new RWAToken());
@@ -67,21 +78,15 @@ contract RWATokenFactory is
         emit BeaconUpdated(newImplementation);
     }
 
-    function createRWAToken(
-        address asset,
-        address oracle,
+    function createRwaToken(
         string memory name,
         string memory symbol
     ) public onlyOwner returns (address) {
-        // Check parameters
-        require(asset != address(0), "Factory: zero asset");
-        require(oracle != address(0), "Factory: zero oracle");
-
         // Encode initialization data
         bytes memory data = abi.encodeWithSelector(
             RWAToken.initialize.selector,
-            asset,
-            oracle,
+            underlyingAsset,
+            multionesOracle,
             address(multionesAccess),
             name,
             symbol
@@ -92,19 +97,41 @@ contract RWATokenFactory is
         address newTokenAddress = address(proxy);
 
         // Register new token
-        isRWAToken[newTokenAddress] = true;
-        allRWATokens.push(newTokenAddress);
+        isRwaToken[newTokenAddress] = true;
+        allRwaTokens.push(newTokenAddress);
 
         // Event
-        emit RWATokenCreated(newTokenAddress, name, symbol, asset);
+        emit RWATokenCreated(newTokenAddress, name, symbol, underlyingAsset);
 
         return newTokenAddress;
     }
 
 
     // =========================== View Functions ==========================
-    function getAllRWATokens() public view returns (address[] memory) {
-        return allRWATokens;
+    function getRwaTokenCount() public view returns (uint256) {
+        return allRwaTokens.length;
+    }
+
+    function getRwaTokenAtIndex(uint256 index) public view returns (address) {
+        return allRwaTokens[index];
+    }
+
+    function getRwaTokens(uint256 cursor, uint256 size) public view returns (address[] memory) {
+        uint256 length = allRwaTokens.length;
+        if (cursor >= length) {
+            return new address[](0);
+        }
+        
+        uint256 effectiveSize = size;
+        if (cursor + size > length) {
+            effectiveSize = length - cursor;
+        }
+
+        address[] memory tokens = new address[](effectiveSize);
+        for (uint256 i = 0; i < effectiveSize; i++) {
+            tokens[i] = allRwaTokens[cursor + i];
+        }
+        return tokens;
     }
 
     function getBeacon() public view returns (address) {
@@ -119,4 +146,3 @@ contract RWATokenFactory is
     // =========================== Storage Gap =============================
     uint256[50] private _gap;
 }
-
