@@ -130,24 +130,24 @@ contract RWAToken is
 
 
     // =========================== Teller Functions ========================
-    function pause() external onlyOwner {
+    function pause() public onlyOwner {
         _pause();
     }
 
-    function unpause() external onlyOwner {
+    function unpause() public onlyOwner {
         _unpause();
     }
 
-    function setIdoMode(bool status) external onlyOwner {
+    function setIdoMode(bool status) public onlyOwner {
         idoMode = status;
         emit IdoModeSet(status);
     }
 
-    function depositAsset(uint256 amount) external onlyTeller {
+    function depositAsset(uint256 amount) public onlyTeller {
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
     }
     
-    function withdrawAsset(address to, uint256 amount) external onlyTeller {
+    function withdrawAsset(address to, uint256 amount) public onlyTeller {
         IERC20(asset()).safeTransfer(to, amount);
     }
 

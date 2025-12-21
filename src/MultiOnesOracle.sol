@@ -99,7 +99,7 @@ contract MultiOnesOracle is
 
 
     // =========================== View functions ==========================
-    function isAssetActive(address token) external view returns (bool) {
+    function isAssetActive(address token) public view returns (bool) {
         return priceData[token].isActive;
     }
 
@@ -107,7 +107,7 @@ contract MultiOnesOracle is
     function getPriceSafe(
         address token, 
         uint256 maxTimeDelay
-    ) external view returns (uint256, uint256) {
+    ) public view returns (uint256, uint256) {
         PriceData memory data = priceData[token];
         require(data.isActive, "MultiOnesOracle: asset not supported");
         require(
@@ -119,7 +119,7 @@ contract MultiOnesOracle is
 
     function getLatestRoundData(
         address token
-    ) external view returns (uint80, uint256, uint256) {
+    ) public view returns (uint80, uint256, uint256) {
         require(priceData[token].isActive, "MultiOnesOracle: asset not supported");
         uint80 currentRoundId = latestRoundId[token];
         RoundData memory data = historicalPrices[token][currentRoundId];
@@ -130,7 +130,7 @@ contract MultiOnesOracle is
     function getRoundData(
         address token, 
         uint80 roundId
-    ) external view returns (uint80, uint256, uint256) {
+    ) public view returns (uint80, uint256, uint256) {
         RoundData memory data = historicalPrices[token][roundId];
         require(data.updatedAt > 0, "MultiOnesOracle: no data for round");
         return (data.roundId, data.price, data.updatedAt);
@@ -139,7 +139,7 @@ contract MultiOnesOracle is
     function getPriceAtTime(
         address token, 
         uint256 timestamp
-    ) external view returns (uint80, uint256, uint256) {
+    ) public view returns (uint80, uint256, uint256) {
         uint80 currentRoundId = latestRoundId[token];
         require(currentRoundId > 0, "MultiOnesOracle: no history");
         
