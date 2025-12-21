@@ -5,16 +5,16 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {MultiOnesConstants} from "./MultiOnesAccess.sol";
 
 contract IDO is 
     ReentrancyGuard, 
-    PausableUpgradeable, 
     UUPSUpgradeable,
+    Initializable,
     MultiOnesConstants 
 {
     // ============================== Library ==============================
@@ -24,10 +24,11 @@ contract IDO is
 
     // ============================== Structs ==============================
     enum AdminStatus {
-        Initial,
+        Active,
         Withdrawn,
-        RwaDeposited,
-        ClaimAllowed
+        Settled,
+        ClaimAllowed,
+        Cancelled
     }
 
     struct IDOInfo {
@@ -51,10 +52,10 @@ contract IDO is
     IAccessControl public multionesAccess;
 
     uint256 public nextIdoId;
-    mapping(uint256 => IDOInfo) public idoInfos;
+    mapping(uint256 => IDOInfo) public idoConfig;
 
     // idoId => user => UserInfo
-    mapping(uint256 => mapping(address => UserInfo)) public userInfos;
+    mapping(uint256 => mapping(address => UserInfo)) public participations;
 
 
     // =============================== Events ==============================
@@ -114,11 +115,9 @@ contract IDO is
         address _paymentToken,
         address _multionesAccess
     ) public initializer {
-        require(_paymentToken != address(0), "IDO: payment token zero address");
-        require(_multionesAccess != address(0), "IDO: access zero address");
+        require(_paymentToken != address(0), "IDO: zero address");
+        require(_multionesAccess != address(0), "IDO: zero address");
 
-        __Pausable_init();
-        
         paymentToken = IERC20(_paymentToken);
         multionesAccess = IAccessControl(_multionesAccess);
         
@@ -131,14 +130,6 @@ contract IDO is
 
 
     // =========================== Admin Functions =========================
-    function pause() public onlyOwner {
-        _pause();
-    }
-
-    function unpause() public onlyOwner {
-        _unpause();
-    }
-
     function createIDO(
         address saleToken,
         uint256 totalSaleAmount,
@@ -147,22 +138,22 @@ contract IDO is
         uint256 endTime
     ) public onlyOwner returns (uint256) {
         // Check parameters
-        require(saleToken != address(0), "IDO: sale token zero address");
-        require(totalSaleAmount > 0, "IDO: sale amount is zero");
-        require(targetRaiseAmount > 0, "IDO: target raise is zero");
-        require(startTime > block.timestamp, "IDO: start time is in the past");
-        require(endTime > startTime, "IDO: invalid time range");
+        require(saleToken != address(0), "IDO: zero address");
+        require(totalSaleAmount > 0, "IDO: zero sale amount");
+        require(targetRaiseAmount > 0, "IDO: zero target raise amount");
+        require(startTime > block.timestamp, "IDO: start in past");
+        require(endTime > startTime, "IDO: invalid times");
 
         // Update state variables
         uint256 idoId = nextIdoId++;
-        idoInfos[idoId] = IDOInfo({
+        idoConfig[idoId] = IDOInfo({
             saleToken: IERC20(saleToken),
             totalSaleAmount: totalSaleAmount,
             targetRaiseAmount: targetRaiseAmount,
             startTime: startTime,
             endTime: endTime,
             totalRaised: 0,
-            adminStatus: AdminStatus.Initial
+            adminStatus: AdminStatus.Active
         });
 
         // Event
@@ -179,13 +170,13 @@ contract IDO is
         uint256 newEndTime
     ) public onlyOwner idoIdExists(idoId) {
         // Check time range
-        IDOInfo storage info = idoInfos[idoId];
+        IDOInfo storage info = idoConfig[idoId];
         uint256 startTime = info.startTime;
         uint256 endTime = info.endTime;
 
         if (block.timestamp < startTime) {
             require(newStartTime > block.timestamp, "IDO: invalid start time");
-            require(newEndTime > newStartTime, "IDO: invalid time range");
+            require(newEndTime > newStartTime, "IDO: invalid times");
         } else if (block.timestamp < endTime) {
             require(newStartTime == startTime, "IDO: can only change end time after started");
             require(newEndTime > block.timestamp, "IDO: invalid end time");
@@ -206,12 +197,12 @@ contract IDO is
         uint256 idoId
     ) public onlyOwner idoIdExists(idoId) {
         // Check time range
-        IDOInfo storage info = idoInfos[idoId];
+        IDOInfo storage info = idoConfig[idoId];
         require(block.timestamp < info.startTime, "IDO: already started");
+        require(info.adminStatus == AdminStatus.Active, "IDO: wrong status");
 
         // Update state variables
-        info.startTime = type(uint256).max;
-        info.endTime = type(uint256).max;
+        info.adminStatus = AdminStatus.Cancelled;
 
         // Event
         emit IDOCancelled(idoId);
@@ -221,9 +212,9 @@ contract IDO is
         uint256 idoId
     ) public onlyOwner nonReentrant idoIdExists(idoId) {
         // Check time range & withdrawal status
-        IDOInfo storage info = idoInfos[idoId];
+        IDOInfo storage info = idoConfig[idoId];
         require(block.timestamp > info.endTime, "IDO: not ended");
-        require(info.adminStatus == AdminStatus.Initial, "IDO: already withdrawn");
+        require(info.adminStatus == AdminStatus.Active, "IDO: already withdrawn");
 
         // Update state, transfer token
         info.adminStatus = AdminStatus.Withdrawn;
@@ -243,7 +234,7 @@ contract IDO is
         uint256 idoId
     ) public onlyOwner nonReentrant idoIdExists(idoId) {
         // Check time range & withdrawal status
-        IDOInfo storage info = idoInfos[idoId];
+        IDOInfo storage info = idoConfig[idoId];
         require(block.timestamp > info.endTime, "IDO: not ended");
         require(
             info.adminStatus == AdminStatus.Withdrawn, 
@@ -258,7 +249,7 @@ contract IDO is
             rwaDeposited = info.totalSaleAmount;
         }
         info.saleToken.safeTransferFrom(msg.sender, address(this), rwaDeposited);
-        info.adminStatus = AdminStatus.RwaDeposited;
+        info.adminStatus = AdminStatus.Settled;
 
         // Event
         emit AdminRwaDeposited(idoId, rwaDeposited);
@@ -267,8 +258,8 @@ contract IDO is
     function allowClaim(
         uint256 idoId
     ) public onlyOwner idoIdExists(idoId) {
-        IDOInfo storage info = idoInfos[idoId];
-        require(info.adminStatus == AdminStatus.RwaDeposited, "IDO: RWA not deposited");
+        IDOInfo storage info = idoConfig[idoId];
+        require(info.adminStatus == AdminStatus.Settled, "IDO: RWA not deposited");
         info.adminStatus = AdminStatus.ClaimAllowed;
         emit AdminClaimAllowed(idoId);
     }
@@ -278,12 +269,13 @@ contract IDO is
     function subscribe(
         uint256 idoId, 
         uint256 amount
-    ) public whenNotPaused nonReentrant idoIdExists(idoId) {
+    ) public nonReentrant idoIdExists(idoId) {
         // Check parameters
-        require(amount > 0, "IDO: amount is zero");
+        require(amount > 0, "IDO: zero amount");
 
         // Check time range
-        IDOInfo storage info = idoInfos[idoId];
+        IDOInfo storage info = idoConfig[idoId];
+        require(info.adminStatus != AdminStatus.Cancelled, "IDO: cancelled");
         require(block.timestamp >= info.startTime, "IDO: not started");
         require(block.timestamp <= info.endTime, "IDO: ended");
 
@@ -291,7 +283,7 @@ contract IDO is
         paymentToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Update state variables
-        userInfos[idoId][msg.sender].subscribedAmount += amount;
+        participations[idoId][msg.sender].subscribedAmount += amount;
         info.totalRaised += amount;
 
         // Event
@@ -299,16 +291,16 @@ contract IDO is
     }
 
     function claim(uint256 idoId) public nonReentrant idoIdExists(idoId) {
-        // Check time range
-        IDOInfo storage info = idoInfos[idoId];
+        IDOInfo storage info = idoConfig[idoId];
+        UserInfo storage user = participations[idoId][msg.sender];
+        uint256 subscribedAmount = user.subscribedAmount;
+
+        require(!user.claimed, "IDO: already claimed");
+        require(subscribedAmount > 0, "IDO: no subscription");
+
+        // Check time range and status
         require(block.timestamp > info.endTime, "IDO: not ended");
         require(info.adminStatus == AdminStatus.ClaimAllowed, "IDO: claim not allowed");
-
-        // Check user info
-        UserInfo storage user = userInfos[idoId][msg.sender];
-        uint256 userSub = user.subscribedAmount;
-        require(!user.claimed, "IDO: already claimed");
-        require(userSub > 0, "IDO: no subscription");
 
         // Update state variables
         user.claimed = true;
@@ -317,15 +309,15 @@ contract IDO is
 
         if (info.totalRaised <= info.targetRaiseAmount) {
             // Under-subscribed or Exact
-            rwaAmount = userSub.mulDiv(info.totalSaleAmount, info.targetRaiseAmount);
+            rwaAmount = subscribedAmount.mulDiv(info.totalSaleAmount, info.targetRaiseAmount);
             refundAmount = 0;
         } else {
             // Over-subscribed: ProRate
-            rwaAmount = userSub.mulDiv(info.totalSaleAmount, info.totalRaised);
-            uint256 cost = userSub.mulDiv(info.targetRaiseAmount, info.totalRaised);
+            rwaAmount = subscribedAmount.mulDiv(info.totalSaleAmount, info.totalRaised);
+            uint256 cost = subscribedAmount.mulDiv(info.targetRaiseAmount, info.totalRaised);
             
-            if (cost > userSub) cost = userSub;
-            refundAmount = userSub - cost;
+            if (cost > subscribedAmount) cost = subscribedAmount;
+            refundAmount = subscribedAmount - cost;
         }
 
         // Distribute token and refund
@@ -336,6 +328,25 @@ contract IDO is
 
         // Event
         emit Claimed(idoId, msg.sender, rwaAmount, refundAmount);
+    }
+
+    function refundWhenCancelled(uint256 idoId) public nonReentrant idoIdExists(idoId) {
+        // Check conditions
+        IDOInfo storage info = idoConfig[idoId];
+        UserInfo storage user = participations[idoId][msg.sender];
+        uint256 subscribedAmount = user.subscribedAmount;
+
+        require(info.adminStatus == AdminStatus.Cancelled, "IDO: not cancelled");
+        require(!user.claimed, "IDO: already claimed");
+        require(subscribedAmount > 0, "IDO: no subscription");
+
+        // Update state
+        user.claimed = true;
+        
+        // Refund full amount
+        paymentToken.safeTransfer(msg.sender, subscribedAmount);
+        
+        emit Claimed(idoId, msg.sender, 0, subscribedAmount);
     }
 
 

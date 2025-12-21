@@ -6,7 +6,6 @@ import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeE
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
@@ -15,7 +14,6 @@ import {MultiOnesConstants} from "./MultiOnesAccess.sol";
 /* Should have multiple instances */
 contract RWAToken is 
     ERC4626Upgradeable, 
-    PausableUpgradeable, 
     UUPSUpgradeable, 
     MultiOnesConstants 
 {
@@ -69,7 +67,6 @@ contract RWAToken is
 
         __ERC20_init(_name, _symbol);
         __ERC4626_init(IERC20(_asset));
-        __Pausable_init();
 
         multionesOracle = IMultiOnesOracle(_oracle);
         multionesAccess = IAccessControl(_multionesAccess);
@@ -102,7 +99,7 @@ contract RWAToken is
         return shares.mulDiv(price, 1e30, rounding);
     }
 
-    function _update(address from, address to, uint256 value) internal override whenNotPaused {
+    function _update(address from, address to, uint256 value) internal override {
         // Allow deposit/withdraw only by owner in IDO mode
         if (idoMode) {
             require(
@@ -130,14 +127,6 @@ contract RWAToken is
 
 
     // =========================== Teller Functions ========================
-    function pause() public onlyOwner {
-        _pause();
-    }
-
-    function unpause() public onlyOwner {
-        _unpause();
-    }
-
     function setIdoMode(bool status) public onlyOwner {
         idoMode = status;
         emit IdoModeSet(status);
