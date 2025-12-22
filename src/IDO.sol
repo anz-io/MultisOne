@@ -61,7 +61,6 @@ contract IDO is
     event IDOCreated(
         uint256 indexed idoId, 
         address indexed saleToken, 
-        uint256 totalSaleAmount, 
         uint256 targetRaiseAmount,
         uint64 startTime,
         uint64 endTime
@@ -128,14 +127,12 @@ contract IDO is
     // =========================== Admin Functions =========================
     function createIdo(
         address saleToken,
-        uint256 totalSaleAmount,
         uint256 targetRaiseAmount,
         uint64 startTime,
         uint64 endTime
     ) public onlyOwner returns (uint256) {
         // Check parameters
         require(saleToken != address(0), "IDO: zero address");
-        require(totalSaleAmount > 0, "IDO: zero sale amount");
         require(targetRaiseAmount > 0, "IDO: zero target raise amount");
         require(startTime > block.timestamp, "IDO: start in past");
         require(endTime > startTime, "IDO: invalid times");
@@ -144,7 +141,7 @@ contract IDO is
         uint256 idoId = nextIdoId++;
         idoInfos[idoId] = IdoInfo({
             saleToken: IERC20(saleToken),
-            totalSaleAmount: totalSaleAmount,
+            totalSaleAmount: 0, // to be updated when deposit RWA
             targetRaiseAmount: targetRaiseAmount,
             startTime: startTime,
             endTime: endTime,
@@ -154,7 +151,7 @@ contract IDO is
 
         // Event
         emit IDOCreated(
-            idoId, saleToken, totalSaleAmount, targetRaiseAmount, startTime, endTime
+            idoId, saleToken, targetRaiseAmount, startTime, endTime
         );
         return idoId;
     }
@@ -227,7 +224,8 @@ contract IDO is
     }
 
     function depositRwa(
-        uint256 idoId
+        uint256 idoId,
+        uint256 rwaAmount
     ) public onlyTeller nonReentrant idoIdExists(idoId) {
         // Check time range & withdrawal status
         IdoInfo storage info = idoInfos[idoId];
@@ -236,19 +234,15 @@ contract IDO is
             info.adminStatus == AdminStatus.Withdrawn, 
             "IDO: funds not withdrawn or RWA already deposited"
         );
+        require(rwaAmount > 0, "IDO: zero RWA amount");
 
         // Update state, transfer token
-        uint256 rwaDeposited = 0;
-        if (info.totalRaised <= info.targetRaiseAmount) {
-            rwaDeposited = info.totalSaleAmount.mulDiv(info.totalRaised, info.targetRaiseAmount);
-        } else {
-            rwaDeposited = info.totalSaleAmount;
-        }
-        info.saleToken.safeTransferFrom(msg.sender, address(this), rwaDeposited);
+        info.saleToken.safeTransferFrom(msg.sender, address(this), rwaAmount);
+        info.totalSaleAmount = rwaAmount;
         info.adminStatus = AdminStatus.Settled;
 
         // Event
-        emit AdminRwaDeposited(idoId, rwaDeposited);
+        emit AdminRwaDeposited(idoId, rwaAmount);
     }
 
     function allowClaim(
@@ -305,15 +299,17 @@ contract IDO is
 
         if (info.totalRaised <= info.targetRaiseAmount) {
             // Under-subscribed or Exact
-            rwaAmount = subscribedAmount.mulDiv(info.totalSaleAmount, info.targetRaiseAmount);
             refundAmount = 0;
         } else {
             // Over-subscribed: ProRate
-            rwaAmount = subscribedAmount.mulDiv(info.totalSaleAmount, info.totalRaised);
             uint256 cost = subscribedAmount.mulDiv(info.targetRaiseAmount, info.totalRaised);
-            
-            if (cost > subscribedAmount) cost = subscribedAmount;
             refundAmount = subscribedAmount - cost;
+        }
+
+        if (info.totalRaised > 0) {
+            rwaAmount = subscribedAmount.mulDiv(info.totalSaleAmount, info.totalRaised);
+        } else {
+            rwaAmount = 0;
         }
 
         // Distribute token and refund
