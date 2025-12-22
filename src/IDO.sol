@@ -7,12 +7,10 @@ import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeE
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
 contract IDO is 
-    ReentrancyGuard, 
     UUPSUpgradeable,
     Initializable,
     MultiOnesBase 
@@ -87,6 +85,11 @@ contract IDO is
         address indexed user, 
         uint256 rwaAmount, 
         uint256 refundAmount
+    );
+    event RefundWhenCancelled(
+        uint256 indexed idoId, 
+        address indexed user, 
+        uint256 amount
     );
 
 
@@ -203,7 +206,7 @@ contract IDO is
 
     function withdrawFunds(
         uint256 idoId
-    ) public onlyTeller nonReentrant idoIdExists(idoId) {
+    ) public onlyTeller idoIdExists(idoId) {
         // Check time range & withdrawal status
         IdoInfo storage info = idoInfos[idoId];
         require(block.timestamp > info.endTime, "IDO: not ended");
@@ -226,7 +229,7 @@ contract IDO is
     function depositRwa(
         uint256 idoId,
         uint256 rwaAmount
-    ) public onlyTeller nonReentrant idoIdExists(idoId) {
+    ) public onlyTeller idoIdExists(idoId) {
         // Check time range & withdrawal status
         IdoInfo storage info = idoInfos[idoId];
         require(block.timestamp > info.endTime, "IDO: not ended");
@@ -237,9 +240,9 @@ contract IDO is
         require(rwaAmount > 0, "IDO: zero RWA amount");
 
         // Update state, transfer token
-        info.saleToken.safeTransferFrom(msg.sender, address(this), rwaAmount);
         info.totalSaleAmount = rwaAmount;
         info.adminStatus = AdminStatus.Settled;
+        info.saleToken.safeTransferFrom(msg.sender, address(this), rwaAmount);
 
         // Event
         emit AdminRwaDeposited(idoId, rwaAmount);
@@ -259,7 +262,7 @@ contract IDO is
     function subscribe(
         uint256 idoId, 
         uint256 amount
-    ) public nonReentrant idoIdExists(idoId) {
+    ) public idoIdExists(idoId) {
         // Check parameters
         require(amount > 0, "IDO: zero amount");
 
@@ -269,18 +272,18 @@ contract IDO is
         require(block.timestamp >= info.startTime, "IDO: not started");
         require(block.timestamp <= info.endTime, "IDO: ended");
 
-        // Transfer payment token
-        paymentToken.safeTransferFrom(msg.sender, address(this), amount);
-
         // Update state variables
         userInfo[idoId][msg.sender].subscribedAmount += amount;
         info.totalRaised += amount;
+
+        // Transfer payment token
+        paymentToken.safeTransferFrom(msg.sender, address(this), amount);
 
         // Event
         emit Subscribed(idoId, msg.sender, amount);
     }
 
-    function claim(uint256 idoId) public nonReentrant idoIdExists(idoId) {
+    function claim(uint256 idoId) public idoIdExists(idoId) {
         IdoInfo storage info = idoInfos[idoId];
         UserInfo storage user = userInfo[idoId][msg.sender];
         uint256 subscribedAmount = user.subscribedAmount;
@@ -322,7 +325,7 @@ contract IDO is
         emit Claimed(idoId, msg.sender, rwaAmount, refundAmount);
     }
 
-    function refundWhenCancelled(uint256 idoId) public nonReentrant idoIdExists(idoId) {
+    function refundWhenCancelled(uint256 idoId) public idoIdExists(idoId) {
         // Check conditions
         IdoInfo storage info = idoInfos[idoId];
         UserInfo storage user = userInfo[idoId][msg.sender];
@@ -338,7 +341,7 @@ contract IDO is
         // Refund full amount
         paymentToken.safeTransfer(msg.sender, subscribedAmount);
         
-        emit Claimed(idoId, msg.sender, 0, subscribedAmount);
+        emit RefundWhenCancelled(idoId, msg.sender, subscribedAmount);
     }
 
 

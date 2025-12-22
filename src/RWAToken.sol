@@ -98,26 +98,41 @@ contract RWAToken is
         return shares.mulDiv(price, 1e30, rounding);
     }
 
+    /**
+     * Permission Table:
+     * +-------------+--------------------+----------------------+------------------------+
+     * | Role / Mode |       User         |      Whitelisted     |         Teller         |
+     * +-------------+--------------------+----------------------+------------------------+
+     * | IDO Mode    |         -  ⬜️      |    Transfer Only 🟦   | Mint/Burn/Transfer 🟩  |
+     * +-------------+--------------------+----------------------+------------------------+
+     * | Normal Mode | Mint/Burn Only 🟧  | Mint/Burn/Transfer 🟩 | Mint/Burn/Transfer 🟩  |
+     * +-------------+--------------------+----------------------+------------------------+
+     */
     function _update(address from, address to, uint256 value) internal override whenNotPaused {
-        // Allow deposit/withdraw only by teller in IDO mode
-        if (idoMode) {
-            require(
-                _isTeller(from) || _isTeller(to), 
-                "RWAToken: only teller can operate in IDO mode"
-            );
-        }
-
-        // Allow Mint (from 0) and Burn (to 0)
-        if (
-            from == address(0) || to == address(0) ||
-            multionesAccess.hasRole(WHITELIST_TRANSFER_ROLE, from) ||
-            multionesAccess.hasRole(WHITELIST_TRANSFER_ROLE, to)
-        ) {
+        // 1. Teller: Always Allowed
+        if (_isTeller(from) || _isTeller(to)) {
             super._update(from, to, value);
             return;
-        } else {
-            revert("RWAToken: not whitelisted");
         }
+        bool isMintOrBurn = (from == address(0) || to == address(0));
+        bool isWhitelisted = multionesAccess.hasRole(WHITELIST_TRANSFER_ROLE, from) || 
+                             multionesAccess.hasRole(WHITELIST_TRANSFER_ROLE, to);
+        if (idoMode) {
+            // 2. IDO Mode:
+            // - User: All Forbidden
+            // - Whitelist: Transfer Only (Mint/Burn Forbidden)
+            require(isWhitelisted, "RWAToken: user operation not allowed");
+            require(!isMintOrBurn, "RWAToken: mint/burn not allowed in IDO mode");
+        } else {
+            // 3. Normal Mode:
+            // - Mint/Burn: Allowed for everyone (User & Whitelist)
+            // - Transfer: Allowed for Whitelist Only
+            require(
+                isMintOrBurn || isWhitelisted,
+                "RWAToken: user transfer not allowed"
+            );
+        }
+        super._update(from, to, value);
     }
 
 
