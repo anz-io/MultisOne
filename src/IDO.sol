@@ -9,13 +9,13 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import {MultiOnesConstants} from "./MultiOnesAccess.sol";
+import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
 contract IDO is 
     ReentrancyGuard, 
     UUPSUpgradeable,
     Initializable,
-    MultiOnesConstants 
+    MultiOnesBase 
 {
     // ============================== Library ==============================
     using SafeERC20 for IERC20;
@@ -49,7 +49,6 @@ contract IDO is
 
     // ============================== Storage ==============================
     IERC20 public paymentToken; // USDC (Universal for all IDOs)
-    IAccessControl public multionesAccess;
 
     uint256 public nextIdoId;
     mapping(uint256 => IdoInfo) public idoInfos;
@@ -93,17 +92,14 @@ contract IDO is
 
 
     // ======================= Modifier & Constructor ======================
-    modifier onlyOwner() {
-        require(
-            multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
-            "MultiOnesAccess: not owner"
-        );
+    modifier idoIdExists(uint256 idoId) {
+        _idoIdExists(idoId);
         _;
     }
 
-    modifier idoIdExists(uint256 idoId) {
+    // wrap modifier logic to reduce code size
+    function _idoIdExists(uint256 idoId) internal view {
         require(idoId > 0 && idoId < nextIdoId, "IDO: invalid ID");
-        _;
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -210,7 +206,7 @@ contract IDO is
 
     function withdrawFunds(
         uint256 idoId
-    ) public onlyOwner nonReentrant idoIdExists(idoId) {
+    ) public onlyTeller nonReentrant idoIdExists(idoId) {
         // Check time range & withdrawal status
         IdoInfo storage info = idoInfos[idoId];
         require(block.timestamp > info.endTime, "IDO: not ended");
@@ -232,7 +228,7 @@ contract IDO is
 
     function depositRwa(
         uint256 idoId
-    ) public onlyOwner nonReentrant idoIdExists(idoId) {
+    ) public onlyTeller nonReentrant idoIdExists(idoId) {
         // Check time range & withdrawal status
         IdoInfo storage info = idoInfos[idoId];
         require(block.timestamp > info.endTime, "IDO: not ended");
@@ -257,7 +253,7 @@ contract IDO is
 
     function allowClaim(
         uint256 idoId
-    ) public onlyOwner idoIdExists(idoId) {
+    ) public onlyTeller idoIdExists(idoId) {
         IdoInfo storage info = idoInfos[idoId];
         require(info.adminStatus == AdminStatus.Settled, "IDO: RWA not deposited");
         info.adminStatus = AdminStatus.ClaimAllowed;

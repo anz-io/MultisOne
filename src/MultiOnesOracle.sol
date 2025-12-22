@@ -6,14 +6,14 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
-import {MultiOnesConstants} from "./MultiOnesAccess.sol";
+import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
 
 contract MultiOnesOracle is 
     UUPSUpgradeable,
     Initializable,
     IMultiOnesOracle, 
-    MultiOnesConstants 
+    MultiOnesBase 
 {
     // ============================== Storage ==============================
     struct PriceData {
@@ -22,15 +22,11 @@ contract MultiOnesOracle is
         uint256 price;
     }
 
-
-    // ============================= Parameters ============================
     struct RoundData {
         uint80 roundId;
         uint48 updatedAt;
         uint256 price;
     }
-
-    IAccessControl public multionesAccess;
 
     mapping(address => PriceData) public priceData;
 
@@ -44,23 +40,7 @@ contract MultiOnesOracle is
     event PriceUpdated(address indexed token, uint48 timestamp, uint256 price, uint80 roundId);
 
 
-    // ======================= Modifier & Constructor ======================
-    modifier onlyOwner() {
-        require(
-            multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
-            "MultiOnesAccess: not owner"
-        );
-        _;
-    }
-
-    modifier onlyPriceUpdater() {
-        require(
-            multionesAccess.hasRole(PRICE_UPDATER_ROLE, msg.sender), 
-            "MultiOnesAccess: not price updater"
-        );
-        _;
-    }
-
+    // ============================ Constructor ============================
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

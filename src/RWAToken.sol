@@ -5,50 +5,38 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
 import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
-import {MultiOnesConstants} from "./MultiOnesAccess.sol";
+import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
 /* Should have multiple instances */
 contract RWAToken is 
     ERC4626Upgradeable, 
-    UUPSUpgradeable, 
-    MultiOnesConstants 
+    PausableUpgradeable,
+    MultiOnesBase 
 {
     // ============================== Library ==============================
     using Math for uint256;
     using SafeERC20 for IERC20;
 
+
     // ============================== Storage ==============================
     bool public idoMode;
     IMultiOnesOracle public multionesOracle;
-    IAccessControl public multionesAccess;
     uint256 public constant ORACLE_TIMEOUT = 24 hours;
+
+    bool public separatedTellerRole;
+    address public localTeller;
 
 
     // =============================== Events ==============================
     event IdoModeSet(bool status);
+    event SeparatedTellerRoleSet(bool status, address newLocalTeller);
 
 
-    // ======================= Modifier & Constructor ======================
-    modifier onlyOwner() {
-        require(
-            multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
-            "MultiOnesAccess: not owner"
-        );
-        _;
-    }
-
-    modifier onlyTeller() {
-        require(
-            multionesAccess.hasRole(TELLER_OPERATOR_ROLE, msg.sender), 
-            "MultiOnesAccess: not teller operator"
-        );
-        _;
-    }
-
+    // ============================ Constructor ============================
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -66,17 +54,29 @@ contract RWAToken is
 
         __ERC20_init(_name, _symbol);
         __ERC4626_init(IERC20(_asset));
+        __Pausable_init();
 
         multionesOracle = IMultiOnesOracle(_multionesOracle);
         multionesAccess = IAccessControl(_multionesAccess);
 
         idoMode = true;
+        separatedTellerRole = false;
         emit IdoModeSet(true);
     }
 
 
     // ========================= Internal functions ========================
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _isTeller(address account) internal view returns (bool) {
+        if (separatedTellerRole) {
+            return account == localTeller;
+        } else {
+            return multionesAccess.hasRole(TELLER_OPERATOR_ROLE, account);
+        }
+    }
+
+    function _onlyTeller() internal override view {
+        require(_isTeller(msg.sender), "RWAToken: not teller");
+    }
 
     function _convertToShares(
         uint256 assets, 
@@ -98,13 +98,12 @@ contract RWAToken is
         return shares.mulDiv(price, 1e30, rounding);
     }
 
-    function _update(address from, address to, uint256 value) internal override {
-        // Allow deposit/withdraw only by owner in IDO mode
+    function _update(address from, address to, uint256 value) internal override whenNotPaused {
+        // Allow deposit/withdraw only by teller in IDO mode
         if (idoMode) {
             require(
-                multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, from) || 
-                multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, to), 
-                "RWAToken: only owner can operate in IDO mode"
+                _isTeller(from) || _isTeller(to), 
+                "RWAToken: only teller can operate in IDO mode"
             );
         }
 
@@ -123,9 +122,17 @@ contract RWAToken is
 
 
     // ====================== Admin & Teller Functions =====================
-    function setIdoMode(bool status) public onlyOwner {
+    function setIdoMode(bool status) public onlyTeller {
         idoMode = status;
         emit IdoModeSet(status);
+    }
+
+    function pause() public onlyTeller {
+        _pause();
+    }
+
+    function unpause() public onlyTeller {
+        _unpause();
     }
 
     function depositAsset(uint256 amount) public onlyTeller {
@@ -134,6 +141,47 @@ contract RWAToken is
     
     function withdrawAsset(address to, uint256 amount) public onlyTeller {
         IERC20(asset()).safeTransfer(to, amount);
+    }
+
+    function setSeparatedTellerRole(
+        address newLocalTeller,
+        bool status
+    ) public onlyOwner {
+        separatedTellerRole = status;
+        localTeller = newLocalTeller;
+        emit SeparatedTellerRoleSet(status, newLocalTeller);
+    }
+
+
+    // =========================== User Functions ==========================
+    function deposit(
+        uint256 assets, 
+        address receiver
+    ) public override onlyKycUser returns (uint256) {
+        return super.deposit(assets, receiver);
+    }
+
+    function mint(
+        uint256 shares, 
+        address receiver
+    ) public override onlyKycUser returns (uint256) {
+        return super.mint(shares, receiver);
+    }
+
+    function withdraw(
+        uint256 assets, 
+        address receiver, 
+        address owner
+    ) public override onlyKycUser returns (uint256) {
+        return super.withdraw(assets, receiver, owner);
+    }
+
+    function redeem(
+        uint256 shares, 
+        address receiver, 
+        address owner
+    ) public override onlyKycUser returns (uint256) {
+        return super.redeem(shares, receiver, owner);
     }
 
 

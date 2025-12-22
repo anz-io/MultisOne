@@ -8,16 +8,15 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {RWAToken} from "./RWAToken.sol";
-import {MultiOnesConstants} from "./MultiOnesAccess.sol";
+import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
 contract RWATokenFactory is 
     UUPSUpgradeable,
     Initializable,
-    MultiOnesConstants
+    MultiOnesBase
 {
     // ============================== Storage ==============================
     UpgradeableBeacon public beacon;
-    IAccessControl public multionesAccess;
     address public underlyingAsset;
     address public multionesOracle;
 
@@ -36,15 +35,7 @@ contract RWATokenFactory is
     event BeaconUpdated(address indexed newImplementation);
 
 
-    // ======================= Modifier & Constructor ======================
-    modifier onlyOwner() {
-        require(
-            multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
-            "MultiOnesAccess: not owner"
-        );
-        _;
-    }
-
+    // ============================ Constructor ============================
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
