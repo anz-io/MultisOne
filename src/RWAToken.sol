@@ -66,6 +66,11 @@ contract RWAToken is
 
 
     // ========================= Internal functions ========================
+    // To adapt for 6-decimals USDC & USDT
+    function _decimalsOffset() internal pure override returns (uint8) {
+        return 12;
+    }
+
     function _isTeller(address account) internal view returns (bool) {
         if (separatedTellerRole) {
             return account == localTeller;

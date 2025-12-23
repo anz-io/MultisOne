@@ -45,6 +45,12 @@ source .env && forge clean && forge script script/IDOClaim.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
+# Upgrade RWA Token Contract (Beacon)
+source .env && forge clean && forge script script/UpgradeRWA.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast --verify
+
+
 
 # Verify RWA Token Proxy
 source .env && forge verify-contract \
