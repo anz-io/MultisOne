@@ -20,11 +20,30 @@ source .env && forge clean && forge script script/UpdatePrice.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
-# Create IDO
+# IDO Create
 source .env && forge clean && forge script script/CreateIDO.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
+# IDO Subscribe
+source .env && forge clean && forge script script/IDOSubscribe.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# KYC Verify
+source .env && forge clean && forge script script/BatchAddKyc.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# IDO Settle
+source .env && forge clean && forge script script/IDOSettle.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# IDO Claim
+source .env && forge clean && forge script script/IDOClaim.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
 
 
 # Verify RWA Token Proxy

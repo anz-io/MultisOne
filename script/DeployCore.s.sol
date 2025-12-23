@@ -67,6 +67,7 @@ contract DeployCore is Script {
         access.grantRole(KYC_OPERATOR_ROLE, kycOperator);
         access.grantRole(PRICE_UPDATER_ROLE, priceUpdater);
         access.grantRole(TELLER_OPERATOR_ROLE, teller);
+        access.grantRole(KYC_VERIFIED_USER_ROLE, deployer);
         access.grantRole(WHITELIST_TRANSFER_ROLE, address(ido));
         console.log("Roles granted.");
 
