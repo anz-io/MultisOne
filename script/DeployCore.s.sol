@@ -8,13 +8,13 @@ import {MultiOnesAccess} from "../src/MultiOnesAccess.sol";
 import {MultiOnesOracle} from "../src/MultiOnesOracle.sol";
 import {RWATokenFactory} from "../src/RWATokenFactory.sol";
 import {IDO} from "../src/IDO.sol";
-import {MockUSDC} from "../test/mocks/MockUSDC.sol";
 
 contract DeployCore is Script {
     // Roles
     bytes32 public constant KYC_OPERATOR_ROLE = keccak256("KYC_OPERATOR_ROLE");
     bytes32 public constant PRICE_UPDATER_ROLE = keccak256("PRICE_UPDATER_ROLE");
     bytes32 public constant TELLER_OPERATOR_ROLE = keccak256("TELLER_OPERATOR_ROLE");
+    bytes32 public constant KYC_VERIFIED_USER_ROLE = keccak256("KYC_VERIFIED_USER_ROLE");
     bytes32 public constant WHITELIST_TRANSFER_ROLE = keccak256("WHITELIST_TRANSFER_ROLE");
 
     function run() public {

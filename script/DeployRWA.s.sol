@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import {RWATokenFactory} from "../src/RWATokenFactory.sol";
-import {RWAToken} from "../src/RWAToken.sol";
 
 contract DeployRWA is Script {
     function run() public {
