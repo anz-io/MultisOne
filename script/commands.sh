@@ -51,6 +51,14 @@ source .env && forge clean && forge script script/UpgradeRWA.s.sol \
     -vvv --broadcast --verify
 
 
+# Verify RWA Token Implementation
+source .env && forge verify-contract \
+    --rpc-url $RPC_SEPOLIA \
+    --etherscan-api-key $API_ETHERSCAN \
+    --compiler-version 0.8.28 \
+    --watch \
+    0xb149F66849AfC43544DbDb14820DfD7CAa649EA1 \
+    ./src/RWAToken.sol:RWAToken
 
 # Verify RWA Token Proxy
 source .env && forge verify-contract \

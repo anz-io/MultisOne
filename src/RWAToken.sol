@@ -23,17 +23,21 @@ contract RWAToken is
 
 
     // ============================== Storage ==============================
+    uint256 public constant ORACLE_TIMEOUT = 24 hours;
+
     bool public idoMode;
     IMultiOnesOracle public multionesOracle;
-    uint256 public constant ORACLE_TIMEOUT = 24 hours;
 
     bool public separatedTellerRole;
     address public localTeller;
+
+    uint256 public maxSupply;
 
 
     // =============================== Events ==============================
     event IdoModeSet(bool status);
     event SeparatedTellerRoleSet(bool status, address newLocalTeller);
+    event MaxSupplySet(uint256 newMaxSupply);
 
 
     // ============================ Constructor ============================
@@ -58,10 +62,12 @@ contract RWAToken is
 
         multionesOracle = IMultiOnesOracle(_multionesOracle);
         multionesAccess = IAccessControl(_multionesAccess);
+        maxSupply = 1_000_000_000 * (10 ** decimals());
 
         idoMode = true;
         separatedTellerRole = false;
         emit IdoModeSet(true);
+        emit MaxSupplySet(maxSupply);
     }
 
 
@@ -103,6 +109,24 @@ contract RWAToken is
         return shares.mulDiv(price, 1e30, rounding);
     }
 
+    function maxDeposit(address) public view override returns (uint256) {
+        uint256 total = totalSupply();
+        if (total >= maxSupply) return 0;
+        
+        // Calculate remaining shares capacity
+        uint256 remainingShares = maxSupply - total;
+        
+        // Convert remaining shares to assets (USDC)
+        // Round DOWN to ensure we don't exceed maxSupply
+        return _convertToAssets(remainingShares, Math.Rounding.Floor);
+    }
+
+    function maxMint(address) public view override returns (uint256) {
+        uint256 total = totalSupply();
+        if (total >= maxSupply) return 0;
+        return maxSupply - total;
+    }
+
     /**
      * Permission Table:
      * +-------------+--------------------+----------------------+------------------------+
@@ -114,6 +138,11 @@ contract RWAToken is
      * +-------------+--------------------+----------------------+------------------------+
      */
     function _update(address from, address to, uint256 value) internal override whenNotPaused {
+        // Check max supply on mint
+        if (from == address(0)) {
+            require(totalSupply() + value <= maxSupply, "RWAToken: max supply exceeded");
+        }
+
         // 1. Teller: Always Allowed
         if (_isTeller(from) || _isTeller(to)) {
             super._update(from, to, value);
@@ -172,6 +201,12 @@ contract RWAToken is
         emit SeparatedTellerRoleSet(status, newLocalTeller);
     }
 
+    function setMaxSupply(uint256 newMaxSupply) public onlyOwner {
+        require(newMaxSupply >= totalSupply(), "RWAToken: new max supply less than total supply");
+        maxSupply = newMaxSupply;
+        emit MaxSupplySet(newMaxSupply);
+    }
+
 
     // =========================== User Functions ==========================
     function deposit(
@@ -206,5 +241,5 @@ contract RWAToken is
 
 
     // =========================== Storage Gap =============================
-    uint256[50] private _gap;
+    uint256[49] private _gap;
 }
