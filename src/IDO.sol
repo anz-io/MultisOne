@@ -10,6 +10,9 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
+/// @title IDO
+/// @notice Manages the Initial Decentralized Offering (IDO) process for RWA tokens.
+/// @dev Handles subscription, RWA token distribution, and refund logic.
 contract IDO is 
     UUPSUpgradeable,
     Initializable,
@@ -21,6 +24,7 @@ contract IDO is
     
 
     // ============================== Structs ==============================
+    /// @notice Status of the IDO Admin process
     enum AdminStatus {
         Active,
         Withdrawn,
@@ -29,6 +33,7 @@ contract IDO is
         Cancelled
     }
 
+    /// @notice Struct containing detailed information about an IDO
     struct IdoInfo {
         IERC20 saleToken;        // RWA Token to be sold
         uint64 startTime;
@@ -39,6 +44,7 @@ contract IDO is
         AdminStatus adminStatus;   // IDO ended -> withdraw USDC -> deposit RWA -> allow claim
     }
 
+    /// @notice Struct containing user participation details
     struct UserInfo {
         uint256 subscribedAmount;  // Amount of USDC deposited
         bool claimed;              // Whether user has claimed
@@ -46,16 +52,22 @@ contract IDO is
 
 
     // ============================== Storage ==============================
-    IERC20 public paymentToken; // USDC (Universal for all IDOs)
+    /// @notice The payment token accepted for subscriptions (e.g., USDC)
+    IERC20 public paymentToken;
 
+    /// @notice Counter for the next IDO ID
     uint256 public nextIdoId;
+    
+    /// @notice Mapping for IDO ID => its information
     mapping(uint256 => IdoInfo) public idoInfos;
 
+    /// @notice Mapping for IDO ID => user address => user info
     // idoId => user => UserInfo
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
 
     // =============================== Events ==============================
+    /// @notice Emitted when a new IDO is created
     event IDOCreated(
         uint256 indexed idoId, 
         address indexed saleToken, 
@@ -63,6 +75,8 @@ contract IDO is
         uint64 startTime,
         uint64 endTime
     );
+    
+    /// @notice Emitted when IDO times are updated
     event IDOTimesUpdated(
         uint256 indexed idoId, 
         uint64 startTime, 
@@ -70,22 +84,35 @@ contract IDO is
         uint64 newStartTime, 
         uint64 newEndTime
     );
+    
+    /// @notice Emitted when an IDO is cancelled
     event IDOCancelled(uint256 indexed idoId);
+    
+    /// @notice Emitted when funds are withdrawn by the admin
     event AdminWithdrawn(uint256 indexed idoId, uint256 usdcAmount);
+    
+    /// @notice Emitted when RWA tokens are deposited by the admin
     event AdminRwaDeposited(uint256 indexed idoId, uint256 rwaAmount);
+    
+    /// @notice Emitted when claiming is allowed by the admin
     event AdminClaimAllowed(uint256 indexed idoId);
 
+    /// @notice Emitted when a user subscribes to an IDO
     event Subscribed(
         uint256 indexed idoId, 
         address indexed user, 
         uint256 amount
     );
+    
+    /// @notice Emitted when a user claims their RWA tokens and/or refund
     event Claimed(
         uint256 indexed idoId, 
         address indexed user, 
         uint256 rwaAmount, 
         uint256 refundAmount
     );
+    
+    /// @notice Emitted when a user gets a refund from a cancelled IDO
     event RefundWhenCancelled(
         uint256 indexed idoId, 
         address indexed user, 
@@ -94,12 +121,13 @@ contract IDO is
 
 
     // ======================= Modifier & Constructor ======================
+    /// @notice Modifier to ensure the IDO ID is valid
     modifier idoIdExists(uint256 idoId) {
         _idoIdExists(idoId);
         _;
     }
 
-    // wrap modifier logic to reduce code size
+    /// @dev Internal check for IDO ID existence to reduce code size
     function _idoIdExists(uint256 idoId) internal view {
         require(idoId > 0 && idoId < nextIdoId, "IDO: invalid ID");
     }
@@ -109,6 +137,9 @@ contract IDO is
         _disableInitializers();
     }
 
+    /// @notice Initializes the IDO contract
+    /// @param _paymentToken The address of the payment token (USDC)
+    /// @param _multionesAccess The address of the AccessControl contract
     function initialize(
         address _paymentToken,
         address _multionesAccess
@@ -124,10 +155,17 @@ contract IDO is
 
 
     // ========================= Internal functions ========================
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    /// @notice Authorizes the upgrade of the contract implementation
+    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {}
 
 
     // =========================== Admin Functions =========================
+    /// @notice Creates a new IDO
+    /// @param saleToken The RWA token address to be sold
+    /// @param targetRaiseAmount The amount of payment tokens to raise
+    /// @param startTime The start timestamp of the IDO
+    /// @param endTime The end timestamp of the IDO
+    /// @return The ID of the newly created IDO
     function createIdo(
         address saleToken,
         uint256 targetRaiseAmount,
@@ -159,7 +197,11 @@ contract IDO is
         return idoId;
     }
 
-    // Can only change `endTime` after IDO begins
+    /// @notice Updates the start and end times of an IDO
+    /// @dev Can only change `endTime` after IDO begins
+    /// @param idoId The ID of the IDO
+    /// @param newStartTime The new start timestamp
+    /// @param newEndTime The new end timestamp
     function updateIdoTimes(
         uint256 idoId, 
         uint64 newStartTime, 
@@ -188,7 +230,9 @@ contract IDO is
         emit IDOTimesUpdated(idoId, startTime, endTime, newStartTime, newEndTime);
     }
 
-    // Only allowed before IDO starts
+    /// @notice Cancels an IDO
+    /// @dev Only allowed before IDO starts
+    /// @param idoId The ID of the IDO
     function cancelIdo(
         uint256 idoId
     ) public onlyOwner idoIdExists(idoId) {
@@ -204,6 +248,8 @@ contract IDO is
         emit IDOCancelled(idoId);
     }
 
+    /// @notice Withdraws the raised funds to the teller
+    /// @param idoId The ID of the IDO
     function withdrawFunds(
         uint256 idoId
     ) public onlyTeller idoIdExists(idoId) {
@@ -226,6 +272,9 @@ contract IDO is
         emit AdminWithdrawn(idoId, usdcWithdrawn);
     }
 
+    /// @notice Deposits RWA tokens for distribution
+    /// @param idoId The ID of the IDO
+    /// @param rwaAmount The amount of RWA tokens to deposit
     function depositRwa(
         uint256 idoId,
         uint256 rwaAmount
@@ -248,6 +297,8 @@ contract IDO is
         emit AdminRwaDeposited(idoId, rwaAmount);
     }
 
+    /// @notice Enables users to claim their tokens
+    /// @param idoId The ID of the IDO
     function allowClaim(
         uint256 idoId
     ) public onlyTeller idoIdExists(idoId) {
@@ -259,6 +310,9 @@ contract IDO is
 
 
     // =========================== User Functions ==========================
+    /// @notice Subscribes to an IDO with payment tokens
+    /// @param idoId The ID of the IDO
+    /// @param amount The amount of payment tokens to subscribe
     function subscribe(
         uint256 idoId, 
         uint256 amount
@@ -283,6 +337,8 @@ contract IDO is
         emit Subscribed(idoId, msg.sender, amount);
     }
 
+    /// @notice Claims RWA tokens and/or refund after IDO ends
+    /// @param idoId The ID of the IDO
     function claim(uint256 idoId) public idoIdExists(idoId) {
         IdoInfo storage info = idoInfos[idoId];
         UserInfo storage user = userInfo[idoId][msg.sender];
@@ -325,6 +381,8 @@ contract IDO is
         emit Claimed(idoId, msg.sender, rwaAmount, refundAmount);
     }
 
+    /// @notice Refunds subscription if the IDO is cancelled
+    /// @param idoId The ID of the IDO
     function refundWhenCancelled(uint256 idoId) public idoIdExists(idoId) {
         // Check conditions
         IdoInfo storage info = idoInfos[idoId];
@@ -346,14 +404,24 @@ contract IDO is
 
 
     // =========================== View Functions ==========================
+    /// @notice Returns the information of a specific IDO
+    /// @param idoId The ID of the IDO
+    /// @return The IdoInfo struct
     function getIdoInfo(uint256 idoId) public view returns (IdoInfo memory) {
         return idoInfos[idoId];
     }
 
+    /// @notice Returns the participation information of a user in a specific IDO
+    /// @param idoId The ID of the IDO
+    /// @param user The address of the user
+    /// @return The UserInfo struct
     function getUserInfo(uint256 idoId, address user) public view returns (UserInfo memory) {
         return userInfo[idoId][user];
     }
 
+    /// @notice Checks if an IDO is currently open for subscription
+    /// @param idoId The ID of the IDO
+    /// @return True if the IDO is active and within the time range
     function isOpen(uint256 idoId) public view returns (bool) {
         IdoInfo storage info = idoInfos[idoId];
         return (

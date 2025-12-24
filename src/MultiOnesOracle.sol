@@ -8,7 +8,8 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
-
+/// @title MultiOnesOracle
+/// @notice Oracle contract for storing and retrieving asset prices.
 contract MultiOnesOracle is 
     UUPSUpgradeable,
     Initializable,
@@ -28,15 +29,21 @@ contract MultiOnesOracle is
         uint256 price;
     }
 
+    /// @notice Stores the latest price data for each asset
     mapping(address => PriceData) public priceData;
 
+    /// @notice Stores the latest round ID for each asset
     mapping(address => uint80) public latestRoundId;
 
+    /// @notice Mapping for RWA Token => round ID => round data
     mapping(address => mapping(uint80 => RoundData)) public historicalPrices;
 
 
     // =============================== Events ==============================
+    /// @notice Emitted when an asset's active status changes
     event AssetStatusChanged(address indexed token, bool isActive);
+
+    /// @notice Emitted when an asset's price is updated
     event PriceUpdated(address indexed token, uint48 timestamp, uint256 price, uint80 roundId);
 
 
@@ -46,6 +53,8 @@ contract MultiOnesOracle is
         _disableInitializers();
     }
 
+    /// @notice Initializes the oracle contract
+    /// @param _multionesAccess The address of the AccessControl contract
     function initialize(address _multionesAccess) public initializer {
         require(_multionesAccess != address(0), "MultiOnesOracle: zero address");
         multionesAccess = IAccessControl(_multionesAccess);
@@ -53,8 +62,10 @@ contract MultiOnesOracle is
 
 
     // ========================= Internal functions ========================
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    /// @notice Authorizes the upgrade of the contract implementation
+    function _authorizeUpgrade(address /*newImplementation*/) internal override onlyOwner {}
 
+    /// @dev Internal function to update the price of an asset
     function _updatePriceInternal(address token, uint256 price) internal {
         require(priceData[token].isActive, "MultiOnesOracle: asset is not active");
         uint48 currentTimestamp = uint48(block.timestamp);
@@ -78,11 +89,17 @@ contract MultiOnesOracle is
 
 
     // =========================== View functions ==========================
+    /// @notice Checks if an asset is active
+    /// @param token The address of the asset
     function isAssetActive(address token) public view returns (bool) {
         return priceData[token].isActive;
     }
 
-    // return price and delay in seconds
+    /// @notice Retrieves the current price of an asset, ensuring it's not stale
+    /// @param token The address of the asset
+    /// @param maxTimeDelay The maximum allowed delay in seconds
+    /// @return price The current price
+    /// @return delay The time elapsed since the last update
     function getPriceSafe(
         address token, 
         uint256 maxTimeDelay
@@ -96,6 +113,8 @@ contract MultiOnesOracle is
         return (data.price, block.timestamp - data.lastUpdate);
     }
 
+    /// @notice Retrieves the latest round data for an asset
+    /// @param token The address of the asset
     function getLatestRoundData(
         address token
     ) public view returns (uint80, uint256, uint256) {
@@ -106,6 +125,9 @@ contract MultiOnesOracle is
         return (data.roundId, data.price, data.updatedAt);
     }
 
+    /// @notice Retrieves historical round data for an asset
+    /// @param token The address of the asset
+    /// @param roundId The round ID to retrieve
     function getRoundData(
         address token, 
         uint80 roundId
@@ -115,6 +137,10 @@ contract MultiOnesOracle is
         return (data.roundId, data.price, data.updatedAt);
     }
 
+    /// @notice Retrieves the price of an asset at a specific timestamp
+    /// @dev Uses binary search to find the closest price update before or at the timestamp
+    /// @param token The address of the asset
+    /// @param timestamp The target timestamp
     function getPriceAtTime(
         address token, 
         uint256 timestamp
@@ -161,15 +187,24 @@ contract MultiOnesOracle is
 
 
     // ====================== Write functions - admin ======================
+    /// @notice Sets the active status of an asset
+    /// @param token The address of the asset
+    /// @param isActive The new status
     function setAssetStatus(address token, bool isActive) public onlyPriceUpdater {
         priceData[token].isActive = isActive;
         emit AssetStatusChanged(token, isActive);
     }
 
+    /// @notice Updates the price of an asset
+    /// @param token The address of the asset
+    /// @param price The new price
     function updatePrice(address token, uint256 price) public onlyPriceUpdater {
         _updatePriceInternal(token, price);
     }
 
+    /// @notice Batch updates prices for multiple assets
+    /// @param tokens Array of asset addresses
+    /// @param prices Array of new prices corresponding to the tokens
     function updatePriceBatch(
         address[] calldata tokens, 
         uint256[] calldata prices

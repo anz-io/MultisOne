@@ -11,7 +11,8 @@ import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC2
 import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
 
-/* Should have multiple instances */
+/// @title RWAToken
+/// @notice ERC4626-compliant RWA token with access control and IDO capabilities.
 contract RWAToken is 
     ERC4626Upgradeable, 
     PausableUpgradeable,
@@ -23,20 +24,33 @@ contract RWAToken is
 
 
     // ============================== Storage ==============================
+    /// @notice Time duration before oracle price is considered stale
     uint256 public constant ORACLE_TIMEOUT = 24 hours;
 
+    /// @notice Whether the token is in IDO mode
     bool public idoMode;
+    
+    /// @notice Reference to the oracle contract
     IMultiOnesOracle public multionesOracle;
 
+    /// @notice Whether a separate local teller role is used
     bool public separatedTellerRole;
+    
+    /// @notice Address of the local teller if separated
     address public localTeller;
 
+    /// @notice Maximum supply of the RWA token
     uint256 public maxSupply;
 
 
     // =============================== Events ==============================
+    /// @notice Emitted when IDO mode is set
     event IdoModeSet(bool status);
+    
+    /// @notice Emitted when the separated teller role status is updated
     event SeparatedTellerRoleSet(bool status, address newLocalTeller);
+    
+    /// @notice Emitted when the maximum supply is updated
     event MaxSupplySet(uint256 newMaxSupply);
 
 
@@ -46,6 +60,13 @@ contract RWAToken is
         _disableInitializers();
     }
 
+    /// @notice Initializes the RWA Token
+    /// @dev Should be called through the `RWATokenFactory` contract
+    /// @param _asset The underlying asset address (e.g., USDC)
+    /// @param _multionesOracle The oracle contract address
+    /// @param _multionesAccess The access control contract address
+    /// @param _name The token name
+    /// @param _symbol The token symbol
     function initialize(
         address _asset, // Underlying asset (USDC)
         address _multionesOracle,
@@ -72,11 +93,14 @@ contract RWAToken is
 
 
     // ========================= Internal functions ========================
-    // To adapt for 6-decimals USDC & USDT
+    /// @notice Returns the number of decimals offset between the token and the asset
+    /// @dev To adapt for 6-decimals USDC & USDT (12 + 6 = 18, expected 18 decimals)
     function _decimalsOffset() internal pure override returns (uint8) {
         return 12;
     }
 
+    /// @notice Checks if an account has the teller role
+    /// @dev Also adapted for separated teller role
     function _isTeller(address account) internal view returns (bool) {
         if (separatedTellerRole) {
             return account == localTeller;
@@ -85,10 +109,12 @@ contract RWAToken is
         }
     }
 
+    /// @notice Internal check to ensure the caller is a teller
     function _onlyTeller() internal override view {
         require(_isTeller(msg.sender), "RWAToken: not teller");
     }
 
+    /// @notice Converts assets to shares using oracle price (overrided logic from ERC4626)
     function _convertToShares(
         uint256 assets, 
         Math.Rounding rounding
@@ -99,6 +125,7 @@ contract RWAToken is
         return assets.mulDiv(1e30, price, rounding);
     }
 
+    /// @notice Converts shares to assets using oracle price (overrided logic from ERC4626)
     function _convertToAssets(
         uint256 shares, 
         Math.Rounding rounding
@@ -109,6 +136,7 @@ contract RWAToken is
         return shares.mulDiv(price, 1e30, rounding);
     }
 
+    /// @notice Returns the maximum amount of assets that can be deposited (overrided)
     function maxDeposit(address) public view override returns (uint256) {
         uint256 total = totalSupply();
         if (total >= maxSupply) return 0;
@@ -121,6 +149,7 @@ contract RWAToken is
         return _convertToAssets(remainingShares, Math.Rounding.Floor);
     }
 
+    /// @notice Returns the maximum amount of shares that can be minted (overrided)
     function maxMint(address) public view override returns (uint256) {
         uint256 total = totalSupply();
         if (total >= maxSupply) return 0;
@@ -128,7 +157,7 @@ contract RWAToken is
     }
 
     /**
-     * Permission Table:
+     * @notice Permission Table:
      * +-------------+--------------------+----------------------+------------------------+
      * | Role / Mode |       User         |      Whitelisted     |         Teller         |
      * +-------------+--------------------+----------------------+------------------------+
@@ -137,6 +166,7 @@ contract RWAToken is
      * | Normal Mode | Mint/Burn Only 🟧  | Mint/Burn/Transfer 🟩 | Mint/Burn/Transfer 🟩  |
      * +-------------+--------------------+----------------------+------------------------+
      */
+    /// @dev Hooks into the update function to enforce permissions
     function _update(address from, address to, uint256 value) internal override whenNotPaused {
         // Check max supply on mint
         if (from == address(0)) {
@@ -171,27 +201,35 @@ contract RWAToken is
 
 
     // ====================== Admin & Teller Functions =====================
+    /// @notice Sets the IDO mode status
     function setIdoMode(bool status) public onlyTeller {
         idoMode = status;
         emit IdoModeSet(status);
     }
 
+    /// @notice Pauses the contract
     function pause() public onlyTeller {
         _pause();
     }
 
+    /// @notice Unpauses the contract
     function unpause() public onlyTeller {
         _unpause();
     }
 
+    /// @notice Deposits underlying assets into the contract
     function depositAsset(uint256 amount) public onlyTeller {
         IERC20(asset()).safeTransferFrom(msg.sender, address(this), amount);
     }
     
+    /// @notice Withdraws underlying assets from the contract
     function withdrawAsset(address to, uint256 amount) public onlyTeller {
         IERC20(asset()).safeTransfer(to, amount);
     }
 
+    /// @notice Sets whether to use a separate local teller role
+    /// @param newLocalTeller The address of the new local teller
+    /// @param status True to enable separated teller role, false otherwise
     function setSeparatedTellerRole(
         address newLocalTeller,
         bool status
@@ -201,14 +239,19 @@ contract RWAToken is
         emit SeparatedTellerRoleSet(status, newLocalTeller);
     }
 
+    /// @notice Sets the maximum supply of the token
     function setMaxSupply(uint256 newMaxSupply) public onlyOwner {
-        require(newMaxSupply >= totalSupply(), "RWAToken: new max supply less than total supply");
+        require(
+            newMaxSupply >= totalSupply(), 
+            "RWAToken: new max supply less than total supply"
+        );
         maxSupply = newMaxSupply;
         emit MaxSupplySet(newMaxSupply);
     }
 
 
     // =========================== User Functions ==========================
+    /// @notice Deposits assets to mint shares, restricted to KYC users (overrided)
     function deposit(
         uint256 assets, 
         address receiver
@@ -216,6 +259,7 @@ contract RWAToken is
         return super.deposit(assets, receiver);
     }
 
+    /// @notice Mints shares by depositing assets, restricted to KYC users (overrided)
     function mint(
         uint256 shares, 
         address receiver
@@ -223,6 +267,7 @@ contract RWAToken is
         return super.mint(shares, receiver);
     }
 
+    /// @notice Withdraws assets by burning shares, restricted to KYC users (overrided)
     function withdraw(
         uint256 assets, 
         address receiver, 
@@ -231,6 +276,7 @@ contract RWAToken is
         return super.withdraw(assets, receiver, owner);
     }
 
+    /// @notice Redeems shares for assets, restricted to KYC users (overrided)
     function redeem(
         uint256 shares, 
         address receiver, 

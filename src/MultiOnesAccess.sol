@@ -7,6 +7,8 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 
 
+/// @title MultiOnesBase
+/// @notice Abstract base contract containing constants & modifiers for the MultiOnes protocol.
 abstract contract MultiOnesBase {
     // ============================= Constants =============================
     bytes32 public constant DEFAULT_ADMIN_ROLE_OVERRIDE = 0x00; // inherit from `AccessControl`
@@ -19,31 +21,36 @@ abstract contract MultiOnesBase {
 
 
     // ============================== Storage ==============================
+    /// @notice Reference to the MultiOnesAccess contract for role checking
     IAccessControl public multionesAccess;
 
 
     // ============================== Modifier =============================
+    /// @notice Modifier to restrict access to the owner (DEFAULT_ADMIN_ROLE)
     modifier onlyOwner() {
         _onlyOwner();
         _;
     }
     
+    /// @notice Modifier to restrict access to teller operators
     modifier onlyTeller() {
         _onlyTeller();
         _;
     }
 
+    /// @notice Modifier to restrict access to KYC verified users
     modifier onlyKycUser() {
         _onlyKycUser();
         _;
     }
 
+    /// @notice Modifier to restrict access to price updaters
     modifier onlyPriceUpdater() {
         _onlyPriceUpdater();
         _;
     }
 
-    // wrap modifier logic to reduce code size
+    /// @dev Internal check for owner role. We wrapped the modifier logic to reduce code size
     function _onlyOwner() internal view {
         require(
             multionesAccess.hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
@@ -51,6 +58,7 @@ abstract contract MultiOnesBase {
         );
     }
 
+    /// @dev Internal check for teller operator role
     function _onlyTeller() internal virtual view {
         require(
             multionesAccess.hasRole(TELLER_OPERATOR_ROLE, msg.sender), 
@@ -58,6 +66,7 @@ abstract contract MultiOnesBase {
         );
     }
 
+    /// @dev Internal check for KYC verified user role
     function _onlyKycUser() internal view {
         require(
             multionesAccess.hasRole(KYC_VERIFIED_USER_ROLE, msg.sender), 
@@ -65,6 +74,7 @@ abstract contract MultiOnesBase {
         );
     }
 
+    /// @dev Internal check for price updater role
     function _onlyPriceUpdater() internal view {
         require(
             multionesAccess.hasRole(PRICE_UPDATER_ROLE, msg.sender), 
@@ -74,12 +84,15 @@ abstract contract MultiOnesBase {
 }
 
 
+/// @title MultiOnesAccess
+/// @notice Manages access control roles and KYC verification status for the MultiOnes protocol.
 contract MultiOnesAccess is 
     AccessControlUpgradeable, 
     UUPSUpgradeable, 
     MultiOnesBase 
 {
     // ============================== Storage ==============================
+    /// @notice Counter for the total number of addresses that have passed KYC
     uint256 public totalKycPassedAddresses;
     
 
@@ -89,6 +102,7 @@ contract MultiOnesAccess is
         _disableInitializers();
     }
 
+    /// @notice Initializes the contract with default admin roles and hierarchy
     function initialize() public initializer {
         __AccessControl_init();
 
@@ -106,7 +120,8 @@ contract MultiOnesAccess is
 
 
     // ========================= Internal functions ========================
-    function _authorizeUpgrade(address) internal view override {
+    /// @notice Authorizes the upgrade of the contract implementation
+    function _authorizeUpgrade(address /*newImplementation*/) internal view override {
         require(
             hasRole(DEFAULT_ADMIN_ROLE_OVERRIDE, msg.sender), 
             "MultiOnesAccess: not owner"
@@ -115,13 +130,18 @@ contract MultiOnesAccess is
 
 
     // =========================== View functions ==========================
+    /// @notice Checks if an account has passed KYC verification
+    /// @param account The address to check
+    /// @return True if the account has the KYC_VERIFIED_USER_ROLE, false otherwise
     function isKycPassed(address account) public view returns (bool) {
         return hasRole(KYC_VERIFIED_USER_ROLE, account);
     }
 
 
     // ========================== Write functions ==========================
-    // Same as calling `grantRole(KYC_VERIFIED_USER_ROLE, account)` by `KYC_OPERATOR_ROLE`
+    /// @notice Grants KYC verified status to an account
+    /// @dev Same as calling `grantRole(KYC_VERIFIED_USER_ROLE, account)` by `KYC_OPERATOR_ROLE`
+    /// @param account The address to be verified
     function kycPass(address account) public onlyRole(KYC_OPERATOR_ROLE) {
         if (!hasRole(KYC_VERIFIED_USER_ROLE, account)) {
             _grantRole(KYC_VERIFIED_USER_ROLE, account);
@@ -129,6 +149,8 @@ contract MultiOnesAccess is
         }
     }
 
+    /// @notice Batch grants KYC verified status to multiple accounts
+    /// @param accounts Array of addresses to be verified
     function kycPassBatch(address[] calldata accounts) public onlyRole(KYC_OPERATOR_ROLE) {
         require(accounts.length > 0, "MultiOnesAccess: accounts is empty");
         require(accounts.length <= MAX_BATCH_SIZE_LIMIT, "MultiOnesAccess: too many accounts");
@@ -140,7 +162,9 @@ contract MultiOnesAccess is
         }
     }
 
-    // Same as calling `revokeRole(KYC_VERIFIED_USER_ROLE, account)` by `KYC_OPERATOR_ROLE`
+    /// @notice Revokes KYC verified status from an account
+    /// @dev Same as calling `revokeRole(KYC_VERIFIED_USER_ROLE, account)` by `KYC_OPERATOR_ROLE`
+    /// @param account The address to have KYC revoked
     function kycRevoke(address account) public onlyRole(KYC_OPERATOR_ROLE) {
         if (hasRole(KYC_VERIFIED_USER_ROLE, account)) {
             _revokeRole(KYC_VERIFIED_USER_ROLE, account);
@@ -148,6 +172,8 @@ contract MultiOnesAccess is
         }
     }
 
+    /// @notice Batch revokes KYC verified status from multiple accounts
+    /// @param accounts Array of addresses to have KYC revoked
     function kycRevokeBatch(address[] calldata accounts) public onlyRole(KYC_OPERATOR_ROLE) {
         require(accounts.length > 0, "MultiOnesAccess: accounts is empty");
         require(accounts.length < MAX_BATCH_SIZE_LIMIT, "MultiOnesAccess: too many accounts");
