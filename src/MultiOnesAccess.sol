@@ -24,6 +24,14 @@ abstract contract MultiOnesBase {
     /// @notice Reference to the MultiOnesAccess contract for role checking
     IAccessControl public multionesAccess;
 
+    /// @notice Switch to enable or disable KYC check (local per contract)
+    bool public kycCheckEnabled;
+
+
+    // =============================== Events ==============================
+    /// @notice Emitted when the KYC check status is updated
+    event KycCheckEnabled(bool status);
+
 
     // ============================== Modifier =============================
     /// @notice Modifier to restrict access to the owner (DEFAULT_ADMIN_ROLE)
@@ -68,10 +76,12 @@ abstract contract MultiOnesBase {
 
     /// @dev Internal check for KYC verified user role
     function _onlyKycUser() internal view {
-        require(
-            multionesAccess.hasRole(KYC_VERIFIED_USER_ROLE, msg.sender), 
-            "MultiOnesAccess: not KYC verified user"
-        );
+        if (kycCheckEnabled) {
+            require(
+                multionesAccess.hasRole(KYC_VERIFIED_USER_ROLE, msg.sender), 
+                "MultiOnesAccess: not KYC verified user"
+            );
+        }
     }
 
     /// @dev Internal check for price updater role
@@ -81,6 +91,18 @@ abstract contract MultiOnesBase {
             "MultiOnesAccess: not price updater"
         );
     }
+
+
+    // =========================== Admin Functions =========================
+    /// @notice Enables or disables the KYC check
+    /// @param status True to enable KYC check, false to disable
+    function setKycCheckEnabled(bool status) public onlyOwner {
+        kycCheckEnabled = status;
+        emit KycCheckEnabled(status);
+    }
+
+    // =========================== Storage Gap =============================
+    uint256[48] private _gap;
 }
 
 
