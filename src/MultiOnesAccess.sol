@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {
-    IAccessControl, AccessControlUpgradeable
-} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
+import {IMultiOnesAccess} from "./interfaces/IMultiOnesAccess.sol";
 
 
 /// @title MultiOnesBase
@@ -21,8 +21,8 @@ abstract contract MultiOnesBase {
 
 
     // ============================== Storage ==============================
-    /// @notice Reference to the MultiOnesAccess contract for role checking
-    IAccessControl public multionesAccess;
+    /// @notice Reference to the MultiOnesAccess contract for role and KYC checking
+    IMultiOnesAccess public multionesAccess;
 
 
     // ============================== Modifier =============================
@@ -69,7 +69,7 @@ abstract contract MultiOnesBase {
     /// @dev Internal check for KYC verified user role
     function _onlyKycUser() internal view {
         require(
-            multionesAccess.hasRole(KYC_VERIFIED_USER_ROLE, msg.sender), 
+            multionesAccess.isKycPassed(msg.sender), 
             "MultiOnesAccess: not KYC verified user"
         );
     }
@@ -95,6 +95,14 @@ contract MultiOnesAccess is
     /// @notice Counter for the total number of addresses that have passed KYC
     uint256 public totalKycPassedAddresses;
     
+    /// @notice Switch to enable or disable KYC check
+    bool public kycCheckEnabled;
+
+
+    // =============================== Events ==============================
+    /// @notice Emitted when the KYC check status is updated
+    event KycCheckEnabled(bool status);
+
 
     // ======================= Modifier & Constructor ======================
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -115,7 +123,7 @@ contract MultiOnesAccess is
 
         _setRoleAdmin(KYC_VERIFIED_USER_ROLE, KYC_OPERATOR_ROLE);
 
-        multionesAccess = IAccessControl(address(this));
+        multionesAccess = IMultiOnesAccess(address(this));
     }
 
 
@@ -132,13 +140,21 @@ contract MultiOnesAccess is
     // =========================== View functions ==========================
     /// @notice Checks if an account has passed KYC verification
     /// @param account The address to check
-    /// @return True if the account has the KYC_VERIFIED_USER_ROLE, false otherwise
+    /// @return True if the account has the KYC_VERIFIED_USER_ROLE,
+    ///    or if KYC check is disabled, False otherwise
     function isKycPassed(address account) public view returns (bool) {
-        return hasRole(KYC_VERIFIED_USER_ROLE, account);
+        return !kycCheckEnabled || hasRole(KYC_VERIFIED_USER_ROLE, account);
     }
 
 
     // ========================== Write functions ==========================
+    /// @notice Enables or disables the KYC check
+    /// @param status True to enable KYC check, false to disable
+    function setKycCheckEnabled(bool status) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        kycCheckEnabled = status;
+        emit KycCheckEnabled(status);
+    }
+
     /// @notice Grants KYC verified status to an account
     /// @dev Same as calling `grantRole(KYC_VERIFIED_USER_ROLE, account)` by `KYC_OPERATOR_ROLE`
     /// @param account The address to be verified
@@ -186,5 +202,5 @@ contract MultiOnesAccess is
     }
     
     // =========================== Storage Gap =============================
-    uint256[50] private _gap;
+    uint256[49] private _gap;
 }

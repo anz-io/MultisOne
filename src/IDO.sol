@@ -4,11 +4,11 @@ pragma solidity ^0.8.20;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
+import {IMultiOnesAccess} from "./interfaces/IMultiOnesAccess.sol";
 
 /// @title IDO
 /// @notice Manages the Initial Decentralized Offering (IDO) process for RWA tokens.
@@ -148,7 +148,7 @@ contract IDO is
         require(_multionesAccess != address(0), "IDO: zero address");
 
         paymentToken = IERC20(_paymentToken);
-        multionesAccess = IAccessControl(_multionesAccess);
+        multionesAccess = IMultiOnesAccess(_multionesAccess);
         
         nextIdoId = 1;       // Start from ID 1
     }

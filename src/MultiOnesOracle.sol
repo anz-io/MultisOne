@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
+import {IMultiOnesAccess} from "./interfaces/IMultiOnesAccess.sol";
+import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
 
 /// @title MultiOnesOracle
 /// @notice Oracle contract for storing and retrieving asset prices.
@@ -57,7 +57,7 @@ contract MultiOnesOracle is
     /// @param _multionesAccess The address of the AccessControl contract
     function initialize(address _multionesAccess) public initializer {
         require(_multionesAccess != address(0), "MultiOnesOracle: zero address");
-        multionesAccess = IAccessControl(_multionesAccess);
+        multionesAccess = IMultiOnesAccess(_multionesAccess);
     }
 
 

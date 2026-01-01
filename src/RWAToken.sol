@@ -4,12 +4,12 @@ pragma solidity ^0.8.20;
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20, SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {ERC4626Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 
-import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
+import {IMultiOnesAccess} from "./interfaces/IMultiOnesAccess.sol";
+import {IMultiOnesOracle} from "./interfaces/IMultiOnesOracle.sol";
 
 /// @title RWAToken
 /// @notice ERC4626-compliant RWA token with access control and IDO capabilities.
@@ -82,7 +82,7 @@ contract RWAToken is
         __Pausable_init();
 
         multionesOracle = IMultiOnesOracle(_multionesOracle);
-        multionesAccess = IAccessControl(_multionesAccess);
+        multionesAccess = IMultiOnesAccess(_multionesAccess);
         maxSupply = 1_000_000_000 * (10 ** decimals());
 
         idoMode = true;

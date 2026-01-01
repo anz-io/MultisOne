@@ -32,6 +32,10 @@ contract MultiOnesAccessTest is BaseTest {
     }
 
     function test_KycRevoke() public {
+        // Ensure KYC check is enabled
+        vm.prank(admin);
+        access.setKycCheckEnabled(true);
+
         vm.startPrank(kycOperator);
         access.kycPass(user1);
         access.kycRevoke(user1);
@@ -42,6 +46,10 @@ contract MultiOnesAccessTest is BaseTest {
     }
 
     function test_KycRevokeBatch() public {
+        // Ensure KYC check is enabled
+        vm.prank(admin);
+        access.setKycCheckEnabled(true);
+
         address[] memory users = new address[](2);
         users[0] = user1;
         users[1] = user2;
@@ -54,6 +62,29 @@ contract MultiOnesAccessTest is BaseTest {
         assertFalse(access.isKycPassed(user1));
         assertFalse(access.isKycPassed(user2));
         assertEq(access.totalKycPassedAddresses(), 0);
+    }
+
+    function test_KycCheckDisabled() public {
+        // 1. Initially check enabled
+        assertFalse(access.kycCheckEnabled()); 
+        assertTrue(access.isKycPassed(user1));
+        
+        // 2. Enable check
+        vm.prank(admin);
+        access.setKycCheckEnabled(true);
+        assertTrue(access.kycCheckEnabled());
+        assertFalse(access.isKycPassed(user1));
+        
+        // Grant role
+        vm.prank(kycOperator);
+        access.kycPass(user1);
+        assertTrue(access.isKycPassed(user1));
+        
+        // 3. Disable check again
+        vm.prank(admin);
+        access.setKycCheckEnabled(false);
+        assertTrue(access.isKycPassed(user1)); // still has role
+        assertTrue(access.isKycPassed(user2)); // no role, but check disabled
     }
 
     function test_RevertIfNotKycOperator() public {

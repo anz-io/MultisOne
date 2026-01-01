@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
@@ -9,6 +8,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 
 import {RWAToken} from "./RWAToken.sol";
 import {MultiOnesBase} from "./MultiOnesAccess.sol";
+import {IMultiOnesAccess} from "./interfaces/IMultiOnesAccess.sol";
 
 /// @title RWATokenFactory
 /// @notice Factory contract for deploying RWA Tokens using the Beacon proxy pattern.
@@ -68,7 +68,7 @@ contract RWATokenFactory is
         
         underlyingAsset = _underlyingAsset;
         multionesOracle = _multionesOracle;
-        multionesAccess = IAccessControl(_multionesAccess);
+        multionesAccess = IMultiOnesAccess(_multionesAccess);
 
         address rwaImplementation = address(new RWAToken());
         beacon = new UpgradeableBeacon(rwaImplementation, address(this));
