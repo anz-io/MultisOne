@@ -27,6 +27,9 @@ contract RWAToken is
     /// @notice Time duration before oracle price is considered stale
     uint256 public constant ORACLE_TIMEOUT = 24 hours;
 
+    /// @notice Fee denominator (10000 = 100%)
+    uint256 public constant FEE_DENOMINATOR = 10000;
+
     /// @notice Whether the token is in IDO mode
     bool public idoMode;
     
@@ -42,6 +45,15 @@ contract RWAToken is
     /// @notice Maximum supply of the RWA token
     uint256 public maxSupply;
 
+    /// @notice Buy fee rate in basis points (e.g. 100 = 1%)
+    uint256 public buyFeeRate;
+
+    /// @notice Sell fee rate in basis points (e.g. 100 = 1%)
+    uint256 public sellFeeRate;
+
+    /// @notice Address to receive fees
+    address public feeCollector;
+
 
     // =============================== Events ==============================
     /// @notice Emitted when IDO mode is set
@@ -52,6 +64,15 @@ contract RWAToken is
     
     /// @notice Emitted when the maximum supply is updated
     event MaxSupplySet(uint256 newMaxSupply);
+
+    /// @notice Emitted when fees are updated
+    event FeesSet(uint256 buyFeeRate, uint256 sellFeeRate);
+
+    /// @notice Emitted when fee collector is updated
+    event FeeCollectorSet(address indexed feeCollector);
+
+    /// @notice Emitted when a fee is collected
+    event FeeCollected(address indexed user, uint256 feeAmount, bool isBuy);
 
 
     // ============================ Constructor ============================
@@ -87,8 +108,15 @@ contract RWAToken is
 
         idoMode = true;
         separatedTellerRole = false;
+
+        buyFeeRate = 0;
+        sellFeeRate = 0;
+        feeCollector = address(this);
+
         emit IdoModeSet(true);
         emit MaxSupplySet(maxSupply);
+        emit FeesSet(0, 0);
+        emit FeeCollectorSet(feeCollector);
     }
 
 
@@ -249,43 +277,110 @@ contract RWAToken is
         emit MaxSupplySet(newMaxSupply);
     }
 
+    /// @notice Sets the buy and sell fee rates
+    /// @param newBuyFeeRate Buy fee in basis points (e.g. 100 = 1%)
+    /// @param newSellFeeRate Sell fee in basis points
+    function setFees(uint256 newBuyFeeRate, uint256 newSellFeeRate) public onlyOwner {
+        require(
+            newBuyFeeRate <= 1000 && newSellFeeRate <= 1000, 
+            "RWAToken: fees too high" // Max 10% safety check
+        );
+        buyFeeRate = newBuyFeeRate;
+        sellFeeRate = newSellFeeRate;
+        emit FeesSet(newBuyFeeRate, newSellFeeRate);
+    }
+
+    /// @notice Sets the fee collector address
+    function setFeeCollector(address newFeeCollector) public onlyOwner {
+        require(newFeeCollector != address(0), "RWAToken: zero address");
+        feeCollector = newFeeCollector;
+        emit FeeCollectorSet(newFeeCollector);
+    }
+
 
     // =========================== User Functions ==========================
-    /// @notice Deposits assets to mint shares, restricted to KYC users (overrided)
-    function deposit(
-        uint256 assets, 
-        address receiver
-    ) public override onlyKycUser returns (uint256) {
-        return super.deposit(assets, receiver);
+    /// @notice Simulate the amount of shares that the assets would buy
+    function previewDeposit(uint256 assets) public view override returns (uint256) {
+        uint256 fee = assets.mulDiv(buyFeeRate, FEE_DENOMINATOR);
+        return _convertToShares(assets - fee, Math.Rounding.Floor);
     }
 
-    /// @notice Mints shares by depositing assets, restricted to KYC users (overrided)
-    function mint(
-        uint256 shares, 
-        address receiver
-    ) public override onlyKycUser returns (uint256) {
-        return super.mint(shares, receiver);
+    /// @notice Simulate the amount of assets required to mint shares
+    function previewMint(uint256 shares) public view override returns (uint256) {
+        uint256 netAssets = _convertToAssets(shares, Math.Rounding.Ceil);
+        // gross * (1 - fee) = net => gross = net / (1 - fee)
+        return netAssets.mulDiv(
+            FEE_DENOMINATOR, FEE_DENOMINATOR - buyFeeRate, Math.Rounding.Ceil
+        );
     }
 
-    /// @notice Withdraws assets by burning shares, restricted to KYC users (overrided)
-    function withdraw(
-        uint256 assets, 
+    /// @notice Simulate the amount of shares required to withdraw assets
+    function previewWithdraw(uint256 assets) public view override returns (uint256) {
+        // gross * (1 - fee) = net => gross = net / (1 - fee)
+        uint256 grossAssets = assets.mulDiv(
+            FEE_DENOMINATOR, FEE_DENOMINATOR - sellFeeRate, Math.Rounding.Ceil
+        );
+        return _convertToShares(grossAssets, Math.Rounding.Ceil);
+    }
+
+    /// @notice Simulate the amount of assets that the shares would redeem
+    function previewRedeem(uint256 shares) public view override returns (uint256) {
+        uint256 grossAssets = _convertToAssets(shares, Math.Rounding.Floor);
+        uint256 fee = grossAssets.mulDiv(sellFeeRate, FEE_DENOMINATOR);
+        return grossAssets - fee;
+    }
+
+    /// @dev Internal deposit implementation (overrided to add fee logging & KYC check)
+    /// @notice Handles both deposit() and mint() flows
+    function _deposit(
+        address caller, 
         address receiver, 
-        address owner
-    ) public override onlyKycUser returns (uint256) {
-        return super.withdraw(assets, receiver, owner);
+        uint256 assets, 
+        uint256 shares
+    ) internal override {
+        // 1. Enforce KYC
+        require(multionesAccess.isKycPassed(caller), "RWAToken: not KYC verified user");
+
+        // 2. Perform transfer and mint
+        super._deposit(caller, receiver, assets, shares);
+
+        // 3. Log Fee and Transfer
+        uint256 fee = assets.mulDiv(buyFeeRate, FEE_DENOMINATOR);
+        if (fee > 0) {
+            if (feeCollector != address(0)) {
+                IERC20(asset()).safeTransfer(feeCollector, fee);
+            }
+            emit FeeCollected(caller, fee, true);
+        }
     }
 
-    /// @notice Redeems shares for assets, restricted to KYC users (overrided)
-    function redeem(
-        uint256 shares, 
+    /// @dev Internal withdraw implementation (overrided to add fee logging & KYC check)
+    /// @notice Handles both withdraw() and redeem() flows
+    function _withdraw(
+        address caller, 
         address receiver, 
-        address owner
-    ) public override onlyKycUser returns (uint256) {
-        return super.redeem(shares, receiver, owner);
+        address owner, 
+        uint256 assets, 
+        uint256 shares
+    ) internal override {
+        // 1. Enforce KYC
+        require(multionesAccess.isKycPassed(caller), "RWAToken: not KYC verified user");
+
+        // 2. Perform burn and transfer
+        super._withdraw(caller, receiver, owner, assets, shares);
+
+        // 3. Log Fee: Difference between Share Value (Gross) and Assets Sent (Net)
+        uint256 grossAssets = _convertToAssets(shares, Math.Rounding.Floor);
+        if (grossAssets > assets) {
+            uint256 fee = grossAssets - assets;
+            if (feeCollector != address(0)) {
+                IERC20(asset()).safeTransfer(feeCollector, fee);
+            }
+            emit FeeCollected(caller, fee, false);
+        }
     }
 
 
     // =========================== Storage Gap =============================
-    uint256[49] private _gap;
+    uint256[46] private _gap;
 }
