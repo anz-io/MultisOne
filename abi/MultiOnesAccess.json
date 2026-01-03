@@ -210,6 +210,19 @@
   },
   {
     "type": "function",
+    "name": "kycCheckEnabled",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "kycPass",
     "inputs": [
       {
@@ -268,7 +281,7 @@
       {
         "name": "",
         "type": "address",
-        "internalType": "contract IAccessControl"
+        "internalType": "contract IMultiOnesAccess"
       }
     ],
     "stateMutability": "view"
@@ -317,6 +330,19 @@
         "name": "account",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setKycCheckEnabled",
+    "inputs": [
+      {
+        "name": "status",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -381,6 +407,19 @@
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "KycCheckEnabled",
+    "inputs": [
+      {
+        "name": "status",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
       }
     ],
     "anonymous": false

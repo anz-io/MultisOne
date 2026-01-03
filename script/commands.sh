@@ -16,38 +16,50 @@ source .env && forge clean && forge script script/DeployRWA.s.sol \
     -vvv --broadcast --verify
 
 # Update Price
-source .env && forge clean && forge script script/UpdatePrice.s.sol \
+source .env && forge script script/UpdatePrice.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
 # IDO Create
-source .env && forge clean && forge script script/CreateIDO.s.sol \
+source .env && forge script script/CreateIDO.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
 # IDO Subscribe
-source .env && forge clean && forge script script/IDOSubscribe.s.sol \
+source .env && forge script script/IDOSubscribe.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
 # KYC Verify
-source .env && forge clean && forge script script/BatchAddKyc.s.sol \
+source .env && forge script script/BatchAddKyc.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
 # IDO Settle
-source .env && forge clean && forge script script/IDOSettle.s.sol \
+source .env && forge script script/IDOSettle.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
 # IDO Claim
-source .env && forge clean && forge script script/IDOClaim.s.sol \
+source .env && forge script script/IDOClaim.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# Config RWA Token Fees
+source .env && forge script script/ConfigFees.s.sol \
     --rpc-url $RPC_SEPOLIA \
     -vvv --broadcast
 
 # Upgrade RWA Token Contract (Beacon)
 source .env && forge clean && forge script script/UpgradeRWA.s.sol \
     --rpc-url $RPC_SEPOLIA \
+    --etherscan-api-key $API_ETHERSCAN \
+    -vvv --broadcast --verify
+
+# Upgrade All Contracts
+source .env && forge clean && forge script script/UpgradeAll.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    --etherscan-api-key $API_ETHERSCAN \
     -vvv --broadcast --verify
 
 

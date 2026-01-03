@@ -296,7 +296,7 @@
       {
         "name": "",
         "type": "address",
-        "internalType": "contract IAccessControl"
+        "internalType": "contract IMultiOnesAccess"
       }
     ],
     "stateMutability": "view"
