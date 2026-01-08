@@ -25,8 +25,8 @@ contract IDOTest is BaseTest {
         ido = IDO(idoProxy);
 
         // Grant Whitelist Role to IDO contract to distribute tokens
-        vm.prank(admin);
-        access.grantRole(WHITELIST_TRANSFER_ROLE, address(ido));
+        vm.prank(kycOperator);
+        access.kycPass(address(ido));
 
         // Create IDO
         vm.prank(admin);

@@ -53,26 +53,29 @@ contract RWATokenTest is BaseTest {
     }
 
     function test_TransferRestriction() public {
+        vm.prank(admin);
+        access.setKycCheckEnabled(true);
+
         vm.prank(teller);
         rwa.setIdoMode(false);
 
         vm.startPrank(kycOperator);
         access.kycPass(user1);
-        access.kycPass(user2);
+        // access.kycPass(user2); // User2 not verified yet
         vm.stopPrank();
 
         vm.startPrank(user1);
         usdc.approve(address(rwa), 100 * 1e6);
         rwa.deposit(100 * 1e6, user1);
         
-        // Transfer should fail if not whitelisted
-        vm.expectRevert("RWAToken: user transfer not allowed");
+        // Transfer should fail if not KYC verified
+        vm.expectRevert("RWAToken: not KYC verified user");
         bool success1 = rwa.transfer(user2, 10 * 1e18);
         assertFalse(success1);
         vm.stopPrank();
 
-        vm.prank(admin);
-        access.grantRole(WHITELIST_TRANSFER_ROLE, user2);
+        vm.prank(kycOperator);
+        access.kycPass(user2);
 
         vm.prank(user1);
         bool success2 = rwa.transfer(user2, 10 * 1e18);

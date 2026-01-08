@@ -90,3 +90,15 @@ source .env && forge verify-contract \
     ) \
     0x51648abb8de4a57d506cc7eb044ad0b003604942 \
     ./lib/openzeppelin-contracts/contracts/proxy/beacon/BeaconProxy.sol:BeaconProxy
+
+
+
+
+# Create new RWA token
+source .env && cast send $SEPOLIA_RWA_FACTORY \
+  "createRwaToken(string,string)" \
+  "Test-IDO-Disable" "TEST0" \
+  --rpc-url $RPC_SEPOLIA \
+  --private-key $PRIVATE_KEY_ADMIN
+
+# "updateIdoTimes(uint256,uint64,uint64) "
