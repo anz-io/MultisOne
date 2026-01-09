@@ -97,19 +97,6 @@
   },
   {
     "type": "function",
-    "name": "WHITELIST_TRANSFER_ROLE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "allowClaim",
     "inputs": [
       {
@@ -201,6 +188,40 @@
   },
   {
     "type": "function",
+    "name": "getBatchUserClaimableAndRefundable",
+    "inputs": [
+      {
+        "name": "idoIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool[]",
+        "internalType": "bool[]"
+      },
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getIdoInfo",
     "inputs": [
       {
@@ -251,6 +272,40 @@
             "internalType": "enum IDO.AdminStatus"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getUserClaimableAndRefundable",
+    "inputs": [
+      {
+        "name": "idoId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "user",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -353,6 +408,24 @@
         "name": "_multionesAccess",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_rwaTokenFactory",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initializeV2",
+    "inputs": [
+      {
+        "name": "_rwaTokenFactory",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -441,6 +514,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "rwaTokenFactory",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",

@@ -19,14 +19,15 @@ contract IDOTest is BaseTest {
 
         // Deploy IDO Contract
         address idoProxy = Upgrades.deployUUPSProxy(
-            "IDO.sol:IDO",
-            abi.encodeCall(IDO.initialize, (address(usdc), address(access)))
+            "IDO.sol:IDO", abi.encodeCall(
+                IDO.initialize, (address(usdc), address(access), address(factory))
+            )
         );
         ido = IDO(idoProxy);
 
         // Grant Whitelist Role to IDO contract to distribute tokens
-        vm.prank(admin);
-        access.grantRole(WHITELIST_TRANSFER_ROLE, address(ido));
+        vm.prank(kycOperator);
+        access.kycPass(address(ido));
 
         // Create IDO
         vm.prank(admin);
@@ -85,10 +86,28 @@ contract IDOTest is BaseTest {
         vm.prank(teller);
         ido.allowClaim(idoId);
 
+        (bool isValid, uint256 rwaAmt, uint256 refundAmt) = ido.getUserClaimableAndRefundable(idoId, user1);
+        assertTrue(isValid);
+        assertEq(rwaAmt, 2 * 1e18);
+        assertEq(refundAmt, 0);
+
+        uint256[] memory ids = new uint256[](1);
+        ids[0] = idoId;
+        (bool[] memory isValids, uint256[] memory rwaAmts, uint256[] memory refundAmts) = 
+            ido.getBatchUserClaimableAndRefundable(ids, user1);
+        assertTrue(isValids[0]);
+        assertEq(rwaAmts[0], 2 * 1e18);
+        assertEq(refundAmts[0], 0);
+
         // Claim
         vm.prank(user1);
         ido.claim(idoId);
         assertEq(rwa.balanceOf(user1), 2 * 1e18);
+        
+        (isValid, rwaAmt, refundAmt) = ido.getUserClaimableAndRefundable(idoId, user1);
+        assertFalse(isValid);
+        assertEq(rwaAmt, 0);
+        assertEq(refundAmt, 0);
     }
 
     function test_CancelIdo() public {

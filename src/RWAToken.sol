@@ -54,6 +54,16 @@ contract RWAToken is
     /// @notice Address to receive fees
     address public feeCollector;
 
+    /// @notice Start time for buying (minting) in Normal Mode
+    uint64 public buyStartTime;
+    /// @notice End time for buying (minting) in Normal Mode
+    uint64 public buyEndTime;
+    
+    /// @notice Start time for selling (burning) in Normal Mode
+    uint64 public sellStartTime;
+    /// @notice End time for selling (burning) in Normal Mode
+    uint64 public sellEndTime;
+
 
     // =============================== Events ==============================
     /// @notice Emitted when IDO mode is set
@@ -73,6 +83,12 @@ contract RWAToken is
 
     /// @notice Emitted when a fee is collected
     event FeeCollected(address indexed user, uint256 feeAmount, bool isBuy);
+
+    /// @notice Emitted when buy duration is set
+    event BuyDurationSet(uint64 startTime, uint64 endTime);
+    
+    /// @notice Emitted when sell duration is set
+    event SellDurationSet(uint64 startTime, uint64 endTime);
 
 
     // ============================ Constructor ============================
@@ -113,6 +129,11 @@ contract RWAToken is
         sellFeeRate = 0;
         feeCollector = address(this);
 
+        buyStartTime = 0;
+        buyEndTime = 0;     // Default not open
+        sellStartTime = 0;
+        sellEndTime = 0;
+
         emit IdoModeSet(true);
         emit MaxSupplySet(maxSupply);
         emit FeesSet(0, 0);
@@ -142,7 +163,7 @@ contract RWAToken is
         require(_isTeller(msg.sender), "RWAToken: not teller");
     }
 
-    /// @notice Converts assets to shares using oracle price (overrided logic from ERC4626)
+    /// @notice Converts assets to shares using oracle price (overrided ERC4626)
     function _convertToShares(
         uint256 assets, 
         Math.Rounding rounding
@@ -153,7 +174,7 @@ contract RWAToken is
         return assets.mulDiv(1e30, price, rounding);
     }
 
-    /// @notice Converts shares to assets using oracle price (overrided logic from ERC4626)
+    /// @notice Converts shares to assets using oracle price (overrided ERC4626)
     function _convertToAssets(
         uint256 shares, 
         Math.Rounding rounding
@@ -186,44 +207,57 @@ contract RWAToken is
 
     /**
      * @notice Permission Table:
-     * +-------------+--------------------+----------------------+------------------------+
-     * | Role / Mode |       User         |      Whitelisted     |         Teller         |
-     * +-------------+--------------------+----------------------+------------------------+
-     * | IDO Mode    |         -  ⬜️      |    Transfer Only 🟦   | Mint/Burn/Transfer 🟩  |
-     * +-------------+--------------------+----------------------+------------------------+
-     * | Normal Mode | Mint/Burn Only 🟧  | Mint/Burn/Transfer 🟩 | Mint/Burn/Transfer 🟩  |
-     * +-------------+--------------------+----------------------+------------------------+
+     * +-------------+-----------------+----------------------+------------------------+
+     * | Role / Mode |   Non-KYC User  |      KYC User        |    Operator (Teller)   |
+     * +-------------+-----------------+----------------------+------------------------+
+     * | IDO Mode    |       -  ⬜️     |    Transfer Only 🟦   | Mint/Burn/Transfer 🟩  |
+     * +-------------+-----------------+----------------------+------------------------+
+     * | Normal Mode |       -  ⬜️     | Mint/Burn/Transfer 🟩 | Mint/Burn/Transfer 🟩  |
+     * +-------------+-----------------+----------------------+------------------------+
      */
     /// @dev Hooks into the update function to enforce permissions
-    function _update(address from, address to, uint256 value) internal override whenNotPaused {
-        // Check max supply on mint
+    function _update(
+        address from, 
+        address to, 
+        uint256 value
+    ) internal override whenNotPaused {
+        // 1. Check max supply on mint
         if (from == address(0)) {
             require(totalSupply() + value <= maxSupply, "RWAToken: max supply exceeded");
         }
 
-        // 1. Teller: Always Allowed
+        // 2. Teller: Always Allowed
         if (_isTeller(from) || _isTeller(to)) {
             super._update(from, to, value);
             return;
         }
-        bool isMintOrBurn = (from == address(0) || to == address(0));
-        bool isWhitelisted = multionesAccess.hasRole(WHITELIST_TRANSFER_ROLE, from) || 
-                             multionesAccess.hasRole(WHITELIST_TRANSFER_ROLE, to);
-        if (idoMode) {
-            // 2. IDO Mode:
-            // - User: All Forbidden
-            // - Whitelist: Transfer Only (Mint/Burn Forbidden)
-            require(isWhitelisted, "RWAToken: user operation not allowed");
-            require(!isMintOrBurn, "RWAToken: mint/burn not allowed in IDO mode");
-        } else {
-            // 3. Normal Mode:
-            // - Mint/Burn: Allowed for everyone (User & Whitelist)
-            // - Transfer: Allowed for Whitelist Only
+
+        // 3. Check KYC status: Both sender and receiver must be KYC verified.
+        // If from/to is 0x0 (Mint/Burn), only check the user side.
+        bool isSenderAllowed = (from == address(0)) || multionesAccess.isKycPassed(from);
+        bool isReceiverAllowed = (to == address(0)) || multionesAccess.isKycPassed(to);
+        require(isSenderAllowed && isReceiverAllowed, "RWAToken: not KYC verified user");
+
+        // 4. Time Limit Checks (Normal Mode)
+        if (from == address(0)) {  // mint (buy)
             require(
-                isMintOrBurn || isWhitelisted,
-                "RWAToken: user transfer not allowed"
+                block.timestamp >= buyStartTime && block.timestamp <= buyEndTime,
+                "RWAToken: buy time not allowed"
             );
         }
+        if (to == address(0)) {   // burn (sell)
+            require(
+                block.timestamp >= sellStartTime && block.timestamp <= sellEndTime,
+                "RWAToken: sell time not allowed"
+            );
+        }
+
+        // 5. IDO Mode only allowed KYC-Users to transfer
+        require(
+            !idoMode || (from != address(0) && to != address(0)), 
+            "RWAToken: KYC-Users only allowed to transfer in IDO mode"
+        );
+
         super._update(from, to, value);
     }
 
@@ -295,6 +329,22 @@ contract RWAToken is
         require(newFeeCollector != address(0), "RWAToken: zero address");
         feeCollector = newFeeCollector;
         emit FeeCollectorSet(newFeeCollector);
+    }
+
+    /// @notice Sets the buy duration (Normal Mode)
+    function setBuyDuration(uint64 start, uint64 end) public onlyOwner {
+        require(end > start, "RWAToken: invalid duration");
+        buyStartTime = start;
+        buyEndTime = end;
+        emit BuyDurationSet(start, end);
+    }
+
+    /// @notice Sets the sell duration (Normal Mode)
+    function setSellDuration(uint64 start, uint64 end) public onlyOwner {
+        require(end > start, "RWAToken: invalid duration");
+        sellStartTime = start;
+        sellEndTime = end;
+        emit SellDurationSet(start, end);
     }
 
 
@@ -382,5 +432,5 @@ contract RWAToken is
 
 
     // =========================== Storage Gap =============================
-    uint256[46] private _gap;
+    uint256[45] private _gap;
 }

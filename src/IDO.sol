@@ -62,8 +62,10 @@ contract IDO is
     mapping(uint256 => IdoInfo) public idoInfos;
 
     /// @notice Mapping for IDO ID => user address => user info
-    // idoId => user => UserInfo
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+
+    /// @notice The RWA Token Factory address for validation
+    address public rwaTokenFactory;
 
 
     // =============================== Events ==============================
@@ -142,15 +144,24 @@ contract IDO is
     /// @param _multionesAccess The address of the AccessControl contract
     function initialize(
         address _paymentToken,
-        address _multionesAccess
+        address _multionesAccess,
+        address _rwaTokenFactory
     ) public initializer {
         require(_paymentToken != address(0), "IDO: zero address");
         require(_multionesAccess != address(0), "IDO: zero address");
 
         paymentToken = IERC20(_paymentToken);
         multionesAccess = IMultiOnesAccess(_multionesAccess);
+        rwaTokenFactory = _rwaTokenFactory;
         
         nextIdoId = 1;       // Start from ID 1
+    }
+
+    /// @notice Initializes the RWA Token Factory address (V2)
+    /// @param _rwaTokenFactory The address of the RWA Token Factory
+    function initializeV2(address _rwaTokenFactory) public reinitializer(2) {
+        require(_rwaTokenFactory != address(0), "IDO: zero address");
+        rwaTokenFactory = _rwaTokenFactory;
     }
 
 
@@ -177,6 +188,13 @@ contract IDO is
         require(targetRaiseAmount > 0, "IDO: zero target raise amount");
         require(startTime > block.timestamp, "IDO: start in past");
         require(endTime > startTime, "IDO: invalid times");
+
+        // Validate Sale Token
+        (bool success, bytes memory data) = rwaTokenFactory.staticcall(
+            abi.encodeWithSelector(bytes4(keccak256("isRwaToken(address)")), saleToken)
+        );
+        require(success && data.length >= 32, "IDO: factory call failed");
+        require(abi.decode(data, (bool)), "IDO: invalid sale token");
 
         // Update state variables
         uint256 idoId = nextIdoId++;
@@ -431,7 +449,70 @@ contract IDO is
         );
     }
 
+    /// @notice Returns the claimable RWA amount and refundable USDC amount for a user
+    /// @param idoId The ID of the IDO
+    /// @param user The address of the user
+    /// @return isValid True if the user can claim
+    /// @return rwaAmount The amount of RWA tokens claimable
+    /// @return refundAmount The amount of payment tokens refundable
+    function getUserClaimableAndRefundable(
+        uint256 idoId, 
+        address user
+    ) public view idoIdExists(idoId) returns (bool, uint256, uint256) {
+        IdoInfo storage info = idoInfos[idoId];
+        UserInfo storage userData = userInfo[idoId][user];
+        uint256 subscribedAmount = userData.subscribedAmount;
+
+        // Return false if claim not allowed, already claimed, or no subscription
+        if (
+            info.adminStatus != AdminStatus.ClaimAllowed || 
+            userData.claimed || subscribedAmount == 0
+        ) {
+            return (false, 0, 0);
+        }
+
+        uint256 rwaAmount = 0;
+        uint256 refundAmount = 0;
+
+        // Calculate refund amount
+        if (info.totalRaised > info.targetRaiseAmount) {
+            uint256 cost = subscribedAmount.mulDiv(info.targetRaiseAmount, info.totalRaised);
+            refundAmount = subscribedAmount - cost;
+        }
+
+        // Calculate RWA amount
+        if (info.totalRaised > 0) {
+            rwaAmount = subscribedAmount.mulDiv(info.totalSaleAmount, info.totalRaised);
+        }
+
+        return (true, rwaAmount, refundAmount);
+    }
+
+    /// @notice Batch returns the claimable and refundable amounts for a user
+    /// @param idoIds The list of IDO IDs to query
+    /// @param user The address of the user
+    /// @return isValids The list of validity status
+    /// @return rwaAmounts The list of claimable RWA amounts
+    /// @return refundAmounts The list of refundable payment token amounts
+    function getBatchUserClaimableAndRefundable(
+        uint256[] calldata idoIds, 
+        address user
+    ) public view returns (bool[] memory, uint256[] memory, uint256[] memory) {
+        uint256 length = idoIds.length;
+        require(length <= 100, "IDO: batch size exceeds limit");
+        
+        bool[] memory isValids = new bool[](length);
+        uint256[] memory rwaAmounts = new uint256[](length);
+        uint256[] memory refundAmounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            (isValids[i], rwaAmounts[i], refundAmounts[i]) = 
+                getUserClaimableAndRefundable(idoIds[i], user);
+        }
+        return (isValids, rwaAmounts, refundAmounts);
+    }
+
 
     // =========================== Storage Gap =============================
-    uint256[50] private _gap;
+    uint256[49] private _gap;
 }

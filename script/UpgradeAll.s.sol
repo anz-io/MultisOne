@@ -6,6 +6,7 @@ import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
 import {RWATokenFactory} from "../src/RWATokenFactory.sol";
+import {RWAToken} from "../src/RWAToken.sol";
 
 contract UpgradeAll is Script {
     function run() public {
@@ -65,6 +66,16 @@ contract UpgradeAll is Script {
         
         factory.upgradeBeacon(newImplementation);
         console.log("Beacon upgraded successfully!");
+
+        // Update all existing tokens to enable Normal Mode
+        uint256 count = factory.getRwaTokenCount();
+        for (uint256 i = 0; i < count; i++) {
+            address tokenAddr = factory.getRwaTokenAtIndex(i);
+            RWAToken rwa = RWAToken(tokenAddr);
+            rwa.setBuyDuration(1767950400, type(uint64).max);
+            rwa.setSellDuration(1767950400, type(uint64).max);
+            console.log("Updated RWAToken at:", tokenAddr);
+        }
 
         vm.stopBroadcast();
     }

@@ -15,7 +15,6 @@ contract DeployCore is Script {
     bytes32 public constant PRICE_UPDATER_ROLE = keccak256("PRICE_UPDATER_ROLE");
     bytes32 public constant TELLER_OPERATOR_ROLE = keccak256("TELLER_OPERATOR_ROLE");
     bytes32 public constant KYC_VERIFIED_USER_ROLE = keccak256("KYC_VERIFIED_USER_ROLE");
-    bytes32 public constant WHITELIST_TRANSFER_ROLE = keccak256("WHITELIST_TRANSFER_ROLE");
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_ADMIN");
@@ -50,25 +49,28 @@ contract DeployCore is Script {
         address usdcAddress = vm.envAddress("MOCK_USDC");
         address factoryProxy = Upgrades.deployUUPSProxy(
             "RWATokenFactory.sol:RWATokenFactory",
-            abi.encodeCall(RWATokenFactory.initialize, (usdcAddress, address(oracle), address(access)))
+            abi.encodeCall(RWATokenFactory.initialize, (
+                usdcAddress, address(oracle), address(access)
+            ))
         );
         RWATokenFactory factory = RWATokenFactory(factoryProxy);
         console.log("RWATokenFactory deployed at:", address(factory));
 
         // 4. Deploy IDO
         address idoProxy = Upgrades.deployUUPSProxy(
-            "IDO.sol:IDO",
-            abi.encodeCall(IDO.initialize, (usdcAddress, address(access)))
+            "IDO.sol:IDO", abi.encodeCall(
+                IDO.initialize, (usdcAddress, address(access), address(factoryProxy))
+            )
         );
         IDO ido = IDO(idoProxy);
         console.log("IDO deployed at:", address(ido));
 
-        // 5. Grant Roles
+        // 5. Grant Roles (IDO contract should have the access to send/receive tokens)
         access.grantRole(KYC_OPERATOR_ROLE, kycOperator);
         access.grantRole(PRICE_UPDATER_ROLE, priceUpdater);
         access.grantRole(TELLER_OPERATOR_ROLE, teller);
-        access.grantRole(KYC_VERIFIED_USER_ROLE, deployer);
-        access.grantRole(WHITELIST_TRANSFER_ROLE, address(ido));
+        access.kycPass(deployer);
+        access.kycPass(address(ido));
         console.log("Roles granted.");
 
         vm.stopBroadcast();
