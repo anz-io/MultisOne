@@ -27,15 +27,6 @@ contract UpgradeRWA is Script {
         factory.upgradeBeacon(newImplementation);
         console.log("Beacon upgraded successfully!");
 
-        uint256 count = factory.getRwaTokenCount();
-        for (uint256 i = 0; i < count; i++) {
-            address tokenAddr = factory.getRwaTokenAtIndex(i);
-            RWAToken rwa = RWAToken(tokenAddr);
-            rwa.setBuyDuration(0, type(uint64).max);
-            rwa.setSellDuration(0, type(uint64).max);
-            console.log("Updated RWAToken at:", tokenAddr);
-        }
-
         vm.stopBroadcast();
     }
 }

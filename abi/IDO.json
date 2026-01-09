@@ -97,19 +97,6 @@
   },
   {
     "type": "function",
-    "name": "WHITELIST_TRANSFER_ROLE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "allowClaim",
     "inputs": [
       {
@@ -421,6 +408,24 @@
         "name": "_multionesAccess",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_rwaTokenFactory",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initializeV2",
+    "inputs": [
+      {
+        "name": "_rwaTokenFactory",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -509,6 +514,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "rwaTokenFactory",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",

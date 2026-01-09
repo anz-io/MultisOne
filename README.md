@@ -26,15 +26,18 @@ MultisOne is a Real World Asset (RWA) tokenization protocol that includes Access
 
 ## Architecture Overview
 
-1.  **MultiOnesAccess**: The central access control contract. It manages roles such as `KYC_OPERATOR_ROLE`, `PRICE_UPDATER_ROLE`, and `TELLER_OPERATOR_ROLE`. It also maintains the KYC status of users (`KYC_VERIFIED_USER_ROLE`), which is required for participating in RWA token activities.
+1.  **MultiOnesAccess**: The central access control contract. It manages RBAC roles and user KYC status (`isKycPassed`). It includes a **Global KYC Switch** that allows admins to bypass KYC checks system-wide for testing or emergency purposes.
 
 2.  **MultiOnesOracle**: Stores asset prices and historical round data. It allows authorized price updaters to feed prices and supports retrieving prices at specific timestamps for accurate value calculation.
 
 3.  **RWATokenFactory**: Responsible for deploying new `RWAToken` instances. It uses an `UpgradeableBeacon` to manage the implementation logic for all deployed RWA tokens. This ensures that all tokens can be upgraded simultaneously by updating the beacon.
 
-4.  **RWAToken**: An ERC4626-compliant token representing the Real World Asset. It supports:
-    *   **IDO Mode**: Restricts transfers and minting/burning to whitelisted addresses.
-    *   **Normal Mode**: Allows broader interactions but still enforces KYC checks for deposits, mints, withdrawals, and redemptions.
+4.  **RWAToken**: An ERC4626-compliant token representing the Real World Asset. Key features include:
+    * **Dual Modes**:
+        * **IDO Mode**: Restricted transfers. Only Teller and KYC-verified users (transfers only) can interact.
+        * **Normal Mode**: Open for subscription/redemption by KYC-verified users within specific **Time Windows** (set by admin).
+    * **Fee Mechanism**: Supports configurable Buy and Sell fees (in basis points) collected to a treasury address.
+    * **Strict Compliance**: Enforces KYC checks for sender and receiver on every transfer/mint/burn.
 
 5.  **IDO**: Manages the fundraising process. It handles subscription with payment tokens (e.g., USDC), enforces vesting/claim periods, and manages the distribution of RWA tokens to subscribers.
 

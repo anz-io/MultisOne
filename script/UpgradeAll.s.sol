@@ -72,8 +72,8 @@ contract UpgradeAll is Script {
         for (uint256 i = 0; i < count; i++) {
             address tokenAddr = factory.getRwaTokenAtIndex(i);
             RWAToken rwa = RWAToken(tokenAddr);
-            rwa.setBuyDuration(0, type(uint64).max);
-            rwa.setSellDuration(0, type(uint64).max);
+            rwa.setBuyDuration(1767950400, type(uint64).max);
+            rwa.setSellDuration(1767950400, type(uint64).max);
             console.log("Updated RWAToken at:", tokenAddr);
         }
 
