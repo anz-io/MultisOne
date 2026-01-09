@@ -19,8 +19,9 @@ contract IDOTest is BaseTest {
 
         // Deploy IDO Contract
         address idoProxy = Upgrades.deployUUPSProxy(
-            "IDO.sol:IDO",
-            abi.encodeCall(IDO.initialize, (address(usdc), address(access)))
+            "IDO.sol:IDO", abi.encodeCall(
+                IDO.initialize, (address(usdc), address(access), address(factory))
+            )
         );
         ido = IDO(idoProxy);
 

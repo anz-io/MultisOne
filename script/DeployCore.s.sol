@@ -58,8 +58,9 @@ contract DeployCore is Script {
 
         // 4. Deploy IDO
         address idoProxy = Upgrades.deployUUPSProxy(
-            "IDO.sol:IDO",
-            abi.encodeCall(IDO.initialize, (usdcAddress, address(access)))
+            "IDO.sol:IDO", abi.encodeCall(
+                IDO.initialize, (usdcAddress, address(access), address(factoryProxy))
+            )
         );
         IDO ido = IDO(idoProxy);
         console.log("IDO deployed at:", address(ido));

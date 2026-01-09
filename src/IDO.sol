@@ -62,8 +62,10 @@ contract IDO is
     mapping(uint256 => IdoInfo) public idoInfos;
 
     /// @notice Mapping for IDO ID => user address => user info
-    // idoId => user => UserInfo
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+
+    /// @notice The RWA Token Factory address for validation
+    address public rwaTokenFactory;
 
 
     // =============================== Events ==============================
@@ -142,15 +144,24 @@ contract IDO is
     /// @param _multionesAccess The address of the AccessControl contract
     function initialize(
         address _paymentToken,
-        address _multionesAccess
+        address _multionesAccess,
+        address _rwaTokenFactory
     ) public initializer {
         require(_paymentToken != address(0), "IDO: zero address");
         require(_multionesAccess != address(0), "IDO: zero address");
 
         paymentToken = IERC20(_paymentToken);
         multionesAccess = IMultiOnesAccess(_multionesAccess);
+        rwaTokenFactory = _rwaTokenFactory;
         
         nextIdoId = 1;       // Start from ID 1
+    }
+
+    /// @notice Initializes the RWA Token Factory address (V2)
+    /// @param _rwaTokenFactory The address of the RWA Token Factory
+    function initializeV2(address _rwaTokenFactory) public reinitializer(2) {
+        require(_rwaTokenFactory != address(0), "IDO: zero address");
+        rwaTokenFactory = _rwaTokenFactory;
     }
 
 
@@ -177,6 +188,13 @@ contract IDO is
         require(targetRaiseAmount > 0, "IDO: zero target raise amount");
         require(startTime > block.timestamp, "IDO: start in past");
         require(endTime > startTime, "IDO: invalid times");
+
+        // Validate Sale Token
+        (bool success, bytes memory data) = rwaTokenFactory.staticcall(
+            abi.encodeWithSelector(bytes4(keccak256("isRwaToken(address)")), saleToken)
+        );
+        require(success && data.length >= 32, "IDO: factory call failed");
+        require(abi.decode(data, (bool)), "IDO: invalid sale token");
 
         // Update state variables
         uint256 idoId = nextIdoId++;
@@ -433,5 +451,5 @@ contract IDO is
 
 
     // =========================== Storage Gap =============================
-    uint256[50] private _gap;
+    uint256[49] private _gap;
 }
