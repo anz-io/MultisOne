@@ -449,6 +449,69 @@ contract IDO is
         );
     }
 
+    /// @notice Returns the claimable RWA amount and refundable USDC amount for a user
+    /// @param idoId The ID of the IDO
+    /// @param user The address of the user
+    /// @return isValid True if the user can claim
+    /// @return rwaAmount The amount of RWA tokens claimable
+    /// @return refundAmount The amount of payment tokens refundable
+    function getUserClaimableAndRefundable(
+        uint256 idoId, 
+        address user
+    ) public view idoIdExists(idoId) returns (bool, uint256, uint256) {
+        IdoInfo storage info = idoInfos[idoId];
+        UserInfo storage userData = userInfo[idoId][user];
+        uint256 subscribedAmount = userData.subscribedAmount;
+
+        // Return false if claim not allowed, already claimed, or no subscription
+        if (
+            info.adminStatus != AdminStatus.ClaimAllowed || 
+            userData.claimed || subscribedAmount == 0
+        ) {
+            return (false, 0, 0);
+        }
+
+        uint256 rwaAmount = 0;
+        uint256 refundAmount = 0;
+
+        // Calculate refund amount
+        if (info.totalRaised > info.targetRaiseAmount) {
+            uint256 cost = subscribedAmount.mulDiv(info.targetRaiseAmount, info.totalRaised);
+            refundAmount = subscribedAmount - cost;
+        }
+
+        // Calculate RWA amount
+        if (info.totalRaised > 0) {
+            rwaAmount = subscribedAmount.mulDiv(info.totalSaleAmount, info.totalRaised);
+        }
+
+        return (true, rwaAmount, refundAmount);
+    }
+
+    /// @notice Batch returns the claimable and refundable amounts for a user
+    /// @param idoIds The list of IDO IDs to query
+    /// @param user The address of the user
+    /// @return isValids The list of validity status
+    /// @return rwaAmounts The list of claimable RWA amounts
+    /// @return refundAmounts The list of refundable payment token amounts
+    function getBatchUserClaimableAndRefundable(
+        uint256[] calldata idoIds, 
+        address user
+    ) public view returns (bool[] memory, uint256[] memory, uint256[] memory) {
+        uint256 length = idoIds.length;
+        require(length <= 100, "IDO: batch size exceeds limit");
+        
+        bool[] memory isValids = new bool[](length);
+        uint256[] memory rwaAmounts = new uint256[](length);
+        uint256[] memory refundAmounts = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            (isValids[i], rwaAmounts[i], refundAmounts[i]) = 
+                getUserClaimableAndRefundable(idoIds[i], user);
+        }
+        return (isValids, rwaAmounts, refundAmounts);
+    }
+
 
     // =========================== Storage Gap =============================
     uint256[49] private _gap;
