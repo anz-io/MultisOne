@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import {RWATokenFactory} from "../src/RWATokenFactory.sol";
+import {RWAToken} from "../src/RWAToken.sol";
 import {Options} from "openzeppelin-foundry-upgrades/Options.sol";
 import {Upgrades} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 
@@ -25,6 +26,15 @@ contract UpgradeRWA is Script {
         
         factory.upgradeBeacon(newImplementation);
         console.log("Beacon upgraded successfully!");
+
+        uint256 count = factory.getRwaTokenCount();
+        for (uint256 i = 0; i < count; i++) {
+            address tokenAddr = factory.getRwaTokenAtIndex(i);
+            RWAToken rwa = RWAToken(tokenAddr);
+            rwa.setBuyDuration(0, type(uint64).max);
+            rwa.setSellDuration(0, type(uint64).max);
+            console.log("Updated RWAToken at:", tokenAddr);
+        }
 
         vm.stopBroadcast();
     }

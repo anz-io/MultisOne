@@ -54,6 +54,16 @@ contract RWAToken is
     /// @notice Address to receive fees
     address public feeCollector;
 
+    /// @notice Start time for buying (minting) in Normal Mode
+    uint64 public buyStartTime;
+    /// @notice End time for buying (minting) in Normal Mode
+    uint64 public buyEndTime;
+    
+    /// @notice Start time for selling (burning) in Normal Mode
+    uint64 public sellStartTime;
+    /// @notice End time for selling (burning) in Normal Mode
+    uint64 public sellEndTime;
+
 
     // =============================== Events ==============================
     /// @notice Emitted when IDO mode is set
@@ -73,6 +83,12 @@ contract RWAToken is
 
     /// @notice Emitted when a fee is collected
     event FeeCollected(address indexed user, uint256 feeAmount, bool isBuy);
+
+    /// @notice Emitted when buy duration is set
+    event BuyDurationSet(uint64 startTime, uint64 endTime);
+    
+    /// @notice Emitted when sell duration is set
+    event SellDurationSet(uint64 startTime, uint64 endTime);
 
 
     // ============================ Constructor ============================
@@ -112,6 +128,11 @@ contract RWAToken is
         buyFeeRate = 0;
         sellFeeRate = 0;
         feeCollector = address(this);
+
+        buyStartTime = 0;
+        buyEndTime = 0;     // Default not open
+        sellStartTime = 0;
+        sellEndTime = 0;
 
         emit IdoModeSet(true);
         emit MaxSupplySet(maxSupply);
@@ -217,7 +238,21 @@ contract RWAToken is
         bool isReceiverAllowed = (to == address(0)) || multionesAccess.isKycPassed(to);
         require(isSenderAllowed && isReceiverAllowed, "RWAToken: not KYC verified user");
 
-        // 4. IDO Mode only allowed KYC-Users to transfer
+        // 4. Time Limit Checks (Normal Mode)
+        if (from == address(0)) {  // mint (buy)
+            require(
+                block.timestamp >= buyStartTime && block.timestamp <= buyEndTime,
+                "RWAToken: buy time not allowed"
+            );
+        }
+        if (to == address(0)) {   // burn (sell)
+            require(
+                block.timestamp >= sellStartTime && block.timestamp <= sellEndTime,
+                "RWAToken: sell time not allowed"
+            );
+        }
+
+        // 5. IDO Mode only allowed KYC-Users to transfer
         require(
             !idoMode || (from != address(0) && to != address(0)), 
             "RWAToken: KYC-Users only allowed to transfer in IDO mode"
@@ -294,6 +329,22 @@ contract RWAToken is
         require(newFeeCollector != address(0), "RWAToken: zero address");
         feeCollector = newFeeCollector;
         emit FeeCollectorSet(newFeeCollector);
+    }
+
+    /// @notice Sets the buy duration (Normal Mode)
+    function setBuyDuration(uint64 start, uint64 end) public onlyOwner {
+        require(end > start, "RWAToken: invalid duration");
+        buyStartTime = start;
+        buyEndTime = end;
+        emit BuyDurationSet(start, end);
+    }
+
+    /// @notice Sets the sell duration (Normal Mode)
+    function setSellDuration(uint64 start, uint64 end) public onlyOwner {
+        require(end > start, "RWAToken: invalid duration");
+        sellStartTime = start;
+        sellEndTime = end;
+        emit SellDurationSet(start, end);
     }
 
 
@@ -381,5 +432,5 @@ contract RWAToken is
 
 
     // =========================== Storage Gap =============================
-    uint256[46] private _gap;
+    uint256[45] private _gap;
 }

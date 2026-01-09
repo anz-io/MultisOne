@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import {RWATokenFactory} from "../src/RWATokenFactory.sol";
+import {RWAToken} from "../src/RWAToken.sol";
 
 contract DeployRWA is Script {
     function run() public {
@@ -20,6 +21,10 @@ contract DeployRWA is Script {
         console.log("RWAToken created at:", rwaAddress);
         console.log("Name:", name);
         console.log("Symbol:", symbol);
+
+        RWAToken(rwaAddress).setBuyDuration(0, type(uint64).max);
+        RWAToken(rwaAddress).setSellDuration(0, type(uint64).max);
+        console.log("RWAToken Normal Mode enabled");
 
         vm.stopBroadcast();
     }

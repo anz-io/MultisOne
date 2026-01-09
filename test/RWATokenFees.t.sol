@@ -20,6 +20,10 @@ contract RWATokenFeesTest is BaseTest {
         address rwaAddress = factory.createRwaToken("RWA1", "RWA1");
         rwa = RWAToken(rwaAddress);
         
+        // Enable Normal Mode Buy/Sell
+        rwa.setBuyDuration(0, type(uint64).max);
+        rwa.setSellDuration(0, type(uint64).max);
+
         // 2. Setup Oracle
         vm.stopPrank();
         vm.startPrank(priceUpdater);

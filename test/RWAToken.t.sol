@@ -18,6 +18,12 @@ contract RWATokenTest is BaseTest {
         oracle.setAssetStatus(address(rwa), true);
         vm.prank(priceUpdater);
         oracle.updatePrice(address(rwa), 1e18); // 1:1 price
+
+        // Enable Normal Mode Buy/Sell
+        vm.startPrank(admin);
+        rwa.setBuyDuration(0, type(uint64).max);
+        rwa.setSellDuration(0, type(uint64).max);
+        vm.stopPrank();
     }
 
     function test_DepositWithdrawByTeller() public {
