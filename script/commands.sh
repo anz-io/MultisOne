@@ -1,3 +1,4 @@
+# =========================== Deploy ===========================
 # Simulate
 source .env && forge clean && forge script script/DeployCore.s.sol \
     --rpc-url $RPC_SEPOLIA \
@@ -15,41 +16,8 @@ source .env && forge clean && forge script script/DeployRWA.s.sol \
     --etherscan-api-key $API_ETHERSCAN \
     -vvv --broadcast --verify
 
-# Update Price
-source .env && forge script script/UpdatePrice.s.sol \
-    --rpc-url $RPC_SEPOLIA \
-    -vvv --broadcast
 
-# IDO Create
-source .env && forge script script/CreateIDO.s.sol \
-    --rpc-url $RPC_SEPOLIA \
-    -vvv --broadcast
-
-# IDO Subscribe
-source .env && forge script script/IDOSubscribe.s.sol \
-    --rpc-url $RPC_SEPOLIA \
-    -vvv --broadcast
-
-# KYC Verify
-source .env && forge script script/BatchAddKyc.s.sol \
-    --rpc-url $RPC_SEPOLIA \
-    -vvv --broadcast
-
-# IDO Settle
-source .env && forge script script/IDOSettle.s.sol \
-    --rpc-url $RPC_SEPOLIA \
-    -vvv --broadcast
-
-# IDO Claim
-source .env && forge script script/IDOClaim.s.sol \
-    --rpc-url $RPC_SEPOLIA \
-    -vvv --broadcast
-
-# Config RWA Token Fees
-source .env && forge script script/ConfigFees.s.sol \
-    --rpc-url $RPC_SEPOLIA \
-    -vvv --broadcast
-
+# =========================== Upgrade ===========================
 # Upgrade RWA Token Contract (Beacon)
 source .env && forge clean && forge script script/UpgradeRWA.s.sol \
     --rpc-url $RPC_SEPOLIA \
@@ -63,6 +31,55 @@ source .env && forge clean && forge script script/UpgradeAll.s.sol \
     -vvv --broadcast --verify
 
 
+# =========================== Price ===========================
+# Update Price
+source .env && forge script script/UpdatePrice.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# Update Price Batch
+source .env && forge script script/UpdatePriceBatch.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+
+# =========================== IDO ===========================
+# IDO Create
+source .env && forge script script/CreateIDO.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# IDO Subscribe
+source .env && forge script script/IDOSubscribe.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# IDO Settle
+source .env && forge script script/IDOSettle.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+# IDO Claim
+source .env && forge script script/IDOClaim.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+
+# =========================== KYC ===========================
+# KYC Verify
+source .env && forge script script/BatchAddKyc.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+
+# =========================== Fees ===========================
+# Config RWA Token Fees
+source .env && forge script script/ConfigFees.s.sol \
+    --rpc-url $RPC_SEPOLIA \
+    -vvv --broadcast
+
+
+# =========================== Verify ===========================
 # Verify RWA Token Implementation
 source .env && forge verify-contract \
     --rpc-url $RPC_SEPOLIA \
@@ -84,11 +101,11 @@ source .env && forge verify-contract \
             $MOCK_USDC \
             $SEPOLIA_MULTIONES_ORACLE \
             $SEPOLIA_MULTIONES_ACCESS \
-            "Real World Asset 1" \
-            "RWA1" \
+            "Test-Normal-Started" \
+            "TEST5" \
         ) \
     ) \
-    0x51648abb8de4a57d506cc7eb044ad0b003604942 \
+    $SEPOLIA_RWA_5 \
     ./lib/openzeppelin-contracts/contracts/proxy/beacon/BeaconProxy.sol:BeaconProxy
 
 
@@ -96,9 +113,19 @@ source .env && forge verify-contract \
 
 # Create new RWA token
 source .env && cast send $SEPOLIA_RWA_FACTORY \
-  "createRwaToken(string,string)" \
-  "Test-IDO-Disable" "TEST0" \
-  --rpc-url $RPC_SEPOLIA \
-  --private-key $PRIVATE_KEY_ADMIN
+    "createRwaToken(string,string)" \
+    "Test-Normal" "TEST4" \
+    --rpc-url $RPC_SEPOLIA \
+    --private-key $PRIVATE_KEY_ADMIN
 
-# "updateIdoTimes(uint256,uint64,uint64) "
+source .env && cast send $SEPOLIA_MULTIONES_IDO \
+    "updateIdoTimes(uint256,uint64,uint64)" \
+    6 1768460268 $(date -v+60S +%s) \
+    --rpc-url $RPC_SEPOLIA \
+    --private-key $PRIVATE_KEY_ADMIN
+
+source .env && cast send $SEPOLIA_RWA_2 \
+    "setBuyDuration(uint64,uint64)" \
+    1768633200 1768719600 \
+    --rpc-url $RPC_SEPOLIA \
+    --private-key $PRIVATE_KEY_ADMIN

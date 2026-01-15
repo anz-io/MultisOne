@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 
 import {IDO} from "../src/IDO.sol";
 
-contract DeployIDO is Script {
+contract CreateIDO is Script {
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_ADMIN");
@@ -13,15 +13,16 @@ contract DeployIDO is Script {
         address rwaAddress = vm.envAddress("SEPOLIA_RWA_2");   // Sale Token
         address idoAddress = vm.envAddress("SEPOLIA_MULTIONES_IDO");
         
-        uint256 targetRaise = uint256(1_000 * 1e6);
+        uint256 targetRaise = uint256(2_000 * 1e6);
         uint64 startTime = uint64(block.timestamp + 60); // Default +1 minute
-        uint64 endTime = uint64(block.timestamp + 3600); // Default +1 hour
+        uint64 endTime = uint64(block.timestamp + 86400); // Default +1 day
 
         vm.startBroadcast(deployerPrivateKey);
 
         IDO ido = IDO(idoAddress);
         uint256 idoId = ido.createIdo(rwaAddress, targetRaise, startTime, endTime);
         console.log("IDO Created! ID:", idoId);
+        console.log("Sale Token:", rwaAddress);
         console.log("Target Raise:", targetRaise);
         console.log("Start Time:", startTime);
         console.log("End Time:", endTime);
