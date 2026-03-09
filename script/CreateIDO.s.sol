@@ -4,13 +4,14 @@ pragma solidity ^0.8.20;
 import {Script, console} from "forge-std/Script.sol";
 
 import {IDO} from "../src/IDO.sol";
+import {RWAToken} from "../src/RWAToken.sol";
 
 contract CreateIDO is Script {
 
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY_ADMIN");
         
-        address rwaAddress = vm.envAddress("SEPOLIA_RWA_2");   // Sale Token
+        address rwaAddress = vm.envAddress("SEPOLIA_RWA_5");   // Sale Token
         address idoAddress = vm.envAddress("SEPOLIA_MULTIONES_IDO");
         
         uint256 targetRaise = uint256(2_000 * 1e6);
@@ -26,6 +27,12 @@ contract CreateIDO is Script {
         console.log("Target Raise:", targetRaise);
         console.log("Start Time:", startTime);
         console.log("End Time:", endTime);
+
+        RWAToken rwa = RWAToken(rwaAddress);
+        if(!rwa.idoMode()) {
+            rwa.setIdoMode(true);
+        }
+        console.log("IDO Mode Enabled!");
 
         vm.stopBroadcast();
     }

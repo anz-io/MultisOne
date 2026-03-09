@@ -120,12 +120,33 @@ source .env && cast send $SEPOLIA_RWA_FACTORY \
 
 source .env && cast send $SEPOLIA_MULTIONES_IDO \
     "updateIdoTimes(uint256,uint64,uint64)" \
-    6 1768460268 $(date -v+60S +%s) \
+    9 1769150376 $(date -v+30S +%s) \
     --rpc-url $RPC_SEPOLIA \
     --private-key $PRIVATE_KEY_ADMIN
 
-source .env && cast send $SEPOLIA_RWA_2 \
+source .env && cast send $SEPOLIA_RWA_3 \
     "setBuyDuration(uint64,uint64)" \
-    1768633200 1768719600 \
+    1769091750 18446744073709551615 \
+    --rpc-url $RPC_SEPOLIA \
+    --private-key $PRIVATE_KEY_ADMIN
+
+# type(uint64).max: 18446744073709551615
+
+source .env && cast send $SEPOLIA_RWA_3 \
+    "setBuyDuration(uint64,uint64)" \
+    1768806000 1769065200 \
+    --rpc-url $RPC_SEPOLIA \
+    --private-key $PRIVATE_KEY_ADMIN
+
+source .env && cast send $MOCK_USDC \
+    "mint(address,uint256)" \
+    0xec2f3771391a7d6ffe9285ae5cbee118e221bec3 \
+    1000000000000 \
+    --rpc-url $RPC_SEPOLIA \
+    --private-key $PRIVATE_KEY_ADMIN
+
+source .env && cast send $SEPOLIA_RWA_5 \
+    "setIdoMode(bool)" \
+    true \
     --rpc-url $RPC_SEPOLIA \
     --private-key $PRIVATE_KEY_ADMIN

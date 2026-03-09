@@ -25,7 +25,7 @@ contract RWAToken is
 
     // ============================== Storage ==============================
     /// @notice Time duration before oracle price is considered stale
-    uint256 public constant ORACLE_TIMEOUT = 24 hours;
+    uint256 public constant ORACLE_TIMEOUT = 180 days;  // 6 months for test, 24h for prod
 
     /// @notice Fee denominator (10000 = 100%)
     uint256 public constant FEE_DENOMINATOR = 10000;

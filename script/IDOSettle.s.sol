@@ -12,9 +12,9 @@ contract IDOSettle is Script {
         address teller = vm.addr(tellerPrivateKey);
         
         address idoAddress = vm.envAddress("SEPOLIA_MULTIONES_IDO");
-        address rwaAddress = vm.envAddress("SEPOLIA_RWA_1");
+        address rwaAddress = vm.envAddress("SEPOLIA_RWA_5");
         address usdcAddress = vm.envAddress("MOCK_USDC");
-        uint256 idoId = 1;
+        uint256 idoId = 9;
 
         vm.startBroadcast(tellerPrivateKey);
 

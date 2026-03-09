@@ -17,3 +17,6 @@ docs/
 # VSCode settings
 .vscode/
 remappings.txt
+
+# MacOS
+.DS_Store
